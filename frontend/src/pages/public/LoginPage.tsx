@@ -60,12 +60,12 @@ export const LoginPage: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
+      console.log('[LoginPage] Initiating Google Sign-In...');
       await loginWithGoogle();
-      handlePostAuthRedirect();
     } catch (err: any) {
+      console.error('[LoginPage] Google sign-in failed:', err);
       const msg = formatAuthError(err);
       if (msg) setError(msg);
-    } finally {
       setLoading(false);
     }
   };
