@@ -63,7 +63,14 @@ export const SignupPage: React.FC = () => {
       setLoading(true);
       setError(null);
       console.log('[SignupPage] Initiating Google Sign-In...');
-      await loginWithGoogle();
+      const profile = await loginWithGoogle();
+      if (profile) {
+        if (profile.religion && profile.username) {
+          navigate('/home');
+        } else {
+          navigate('/setup-profile');
+        }
+      }
     } catch (err: any) {
       console.error('[SignupPage] Google signup failed:', err);
       const msg = formatAuthError(err);

@@ -30,7 +30,7 @@ interface AuthContextType {
   loading: boolean;
   login: (email: string, pass: string) => Promise<void>;
   signup: (name: string, email: string, pass: string) => Promise<void>;
-  loginWithGoogle: () => Promise<void>;
+  loginWithGoogle: () => Promise<UserProfile | null>;
   quickLogin: (role: 'admin' | 'user') => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -350,10 +350,69 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // Real Google OAuth Login with Firebase & Firestore database
-  const loginWithGoogle = async () => {
+  const loginWithGoogle = async (): Promise<UserProfile | null> => {
     if (isFirebaseConfigured && auth) {
-      console.log('[Auth] Initiating Google signInWithRedirect...');
-      await signInWithRedirect(auth, googleProvider);
+      console.log('[Auth] Initiating Google popup sign-in...');
+      const res = await signInWithPopup(auth, googleProvider);
+      if (!res?.user) return null;
+
+      const idToken = await res.user.getIdToken();
+      setToken(idToken);
+      localStorage.setItem('craft_ai_token', idToken);
+
+      let profile: UserProfile = {
+        uid: res.user.uid,
+        name: res.user.displayName || res.user.email?.split('@')[0] || 'User',
+        email: res.user.email || '',
+        photoUrl: res.user.photoURL || '',
+        role: res.user.email?.toLowerCase().includes('admin') ? 'admin' : 'user',
+        plan: res.user.email?.toLowerCase().includes('admin') ? 'Administrator' : 'Free User',
+        createdAt: new Date().toISOString(),
+        lastLoginAt: new Date().toISOString(),
+      };
+
+      // Set user immediately in state and storage so routing never lags
+      setUser(profile);
+      if (profile.photoUrl) {
+        setUserPhotoUrl(profile.photoUrl);
+        localStorage.setItem('craft_ai_photo', profile.photoUrl);
+      }
+      localStorage.setItem('craft_ai_user', JSON.stringify(profile));
+
+      // Asynchronously sync Firestore without blocking the UI
+      if (db) {
+        try {
+          const userRef = doc(db, 'users', res.user.uid);
+          getDoc(userRef).then((snap) => {
+            if (snap.exists()) {
+              const data = snap.data();
+              const merged = {
+                ...profile,
+                name: data.name || profile.name,
+                username: data.username || profile.username,
+                religion: data.religion || profile.religion,
+                photoUrl: data.photoUrl || profile.photoUrl,
+                role: data.role || profile.role,
+                plan: data.plan || profile.plan,
+              };
+              setUser(merged);
+              localStorage.setItem('craft_ai_user', JSON.stringify(merged));
+              setDoc(userRef, { lastLoginAt: new Date().toISOString() }, { merge: true }).catch(() => {});
+            } else {
+              setDoc(userRef, profile, { merge: true }).catch(() => {});
+            }
+          }).catch(() => {});
+        } catch {}
+      }
+
+      fetch('/api/users/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(profile),
+      }).catch(() => {});
+      realtimeStore.saveUser(profile).catch(() => {});
+
+      return profile;
     } else {
       throw new Error('Firebase Auth not available.');
     }
