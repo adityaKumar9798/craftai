@@ -1,0 +1,70 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Great+Vibes&display=swap');
+@import "tailwindcss";
+
+:root {
+  --brand-pink: #F72585;
+  --brand-purple: #A020F0;
+  --brand-blue: #3B82F6;
+  --bg-primary: #FFFFFF;
+  --bg-secondary: #F8F9FC;
+  --text-primary: #111827;
+  --text-secondary: #6B7280;
+  --border-color: #E5E7EB;
+}
+
+body {
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background-color: #FFFFFF;
+  color: #111827;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+.brand-gradient {
+  background: linear-gradient(135deg, #F72585 0%, #A020F0 50%, #3B82F6 100%);
+}
+
+.brand-gradient-text {
+  background: linear-gradient(135deg, #F72585 0%, #A020F0 50%, #3B82F6 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.brand-gradient-soft {
+  background: linear-gradient(135deg, rgba(247, 37, 133, 0.08) 0%, rgba(160, 32, 240, 0.08) 50%, rgba(59, 130, 246, 0.08) 100%);
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Aspect ratio 9:16 for stories */
+.aspect-story {
+  aspect-ratio: 9 / 16;
+}
+
+/* Safe area for mobile devices */
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 1rem);
+}
+
+/* Custom Sleek Scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
