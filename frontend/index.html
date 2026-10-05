@@ -10,6 +10,105 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Global Netlify Badge and Drawer Blocker -->
+    <style>
+      netlify-drawer,
+      .netlify-drawer,
+      #netlify-drawer,
+      [data-netlify-drawer],
+      [data-netlify-badge],
+      #netlify-feedback-widget,
+      [id*="netlify"],
+      iframe[src*="netlify"],
+      iframe#netlify-drawer,
+      iframe[title*="Netlify"],
+      a[href*="netlify.com"],
+      a[href*="netlify.app"],
+      img[src*="netlify.com"],
+      img[src*="api.netlify.com"],
+      img[alt*="Netlify"],
+      div:has(> a[href*="netlify.com"]),
+      div:has(> a[href*="netlify.app"]) {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+        position: fixed !important;
+        top: -99999px !important;
+        left: -99999px !important;
+        width: 0 !important;
+        height: 0 !important;
+        z-index: -999999 !important;
+      }
+    </style>
+
+    <script>
+      (function() {
+        function removeNetlifyElements() {
+          try {
+            // 1. Target known Netlify selectors
+            const selectors = [
+              'netlify-drawer',
+              '.netlify-drawer',
+              '#netlify-drawer',
+              '[data-netlify-drawer]',
+              '[data-netlify-badge]',
+              '#netlify-feedback-widget',
+              'iframe[src*="netlify"]',
+              'iframe#netlify-drawer',
+              'iframe[title*="Netlify"]',
+              'a[href*="netlify.com"]',
+              'a[href*="netlify.app"]',
+              'img[src*="api.netlify.com"]',
+              'img[alt*="Netlify"]'
+            ];
+
+            selectors.forEach(function(sel) {
+              var nodes = document.querySelectorAll(sel);
+              for (var i = 0; i < nodes.length; i++) {
+                var el = nodes[i];
+                var parentPill = el.closest('div, a, footer, aside, section');
+                if (parentPill && parentPill !== document.body && parentPill !== document.documentElement && parentPill.id !== 'root') {
+                  parentPill.style.display = 'none';
+                  parentPill.remove();
+                } else {
+                  el.style.display = 'none';
+                  el.remove();
+                }
+              }
+            });
+
+            // 2. Target any container element with text "Powered by Netlify"
+            var allElements = document.querySelectorAll('div, a, span, button, footer, p');
+            for (var j = 0; j < allElements.length; j++) {
+              var elem = allElements[j];
+              if (elem.id !== 'root' && elem !== document.body && elem.children.length <= 4) {
+                var text = (elem.innerText || elem.textContent || '').trim().toLowerCase();
+                if (text.includes('powered by netlify') || text === 'netlify' || text.includes('deploy status')) {
+                  elem.style.display = 'none';
+                  elem.style.visibility = 'hidden';
+                  elem.style.opacity = '0';
+                  elem.style.pointerEvents = 'none';
+                  elem.remove();
+                }
+              }
+            }
+          } catch (err) {}
+        }
+
+        if (typeof window !== 'undefined') {
+          document.addEventListener('DOMContentLoaded', removeNetlifyElements);
+          window.addEventListener('load', removeNetlifyElements);
+          setInterval(removeNetlifyElements, 250);
+
+          if (window.MutationObserver) {
+            var observer = new MutationObserver(removeNetlifyElements);
+            observer.observe(document.documentElement, { childList: true, subtree: true });
+          }
+        }
+      })();
+    </script>
   </head>
   <body class="bg-white text-gray-900 min-h-screen antialiased selection:bg-purple-100 selection:text-purple-900">
     <div id="root"></div>
