@@ -38,6 +38,7 @@
       (function() {
         function removeExternalNetlifyInjections() {
           try {
+            if (!document.body) return;
             var children = document.body.children;
             for (var i = children.length - 1; i >= 0; i--) {
               var el = children[i];
@@ -50,12 +51,14 @@
         }
 
         if (typeof window !== 'undefined') {
-          document.addEventListener('DOMContentLoaded', removeExternalNetlifyInjections);
+          document.addEventListener('DOMContentLoaded', function() {
+            removeExternalNetlifyInjections();
+            if (window.MutationObserver && document.body) {
+              new MutationObserver(removeExternalNetlifyInjections).observe(document.body, { childList: true });
+            }
+          });
           window.addEventListener('load', removeExternalNetlifyInjections);
-          setInterval(removeExternalNetlifyInjections, 500);
-          if (window.MutationObserver) {
-            new MutationObserver(removeExternalNetlifyInjections).observe(document.body, { childList: true });
-          }
+          setInterval(removeExternalNetlifyInjections, 1000);
         }
       })();
     </script>
