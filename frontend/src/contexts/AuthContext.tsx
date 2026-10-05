@@ -352,75 +352,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Real Google OAuth Login with Firebase & Firestore database
   const loginWithGoogle = async () => {
     if (isFirebaseConfigured && auth) {
-      // Mobile / DevTools Responsive Mode: Always use redirect because mobile viewports block multi-window popups
-      const isMobile = typeof window !== 'undefined' && (window.innerWidth <= 768 || 'ontouchstart' in window);
-
-      if (isMobile) {
-        console.log('[Auth] Mobile viewport detected: Using signInWithRedirect');
-        await signInWithRedirect(auth, googleProvider);
-        return;
-      }
-
-      // Desktop: Use popup with resolver and safe fallback
-      try {
-        const res = await signInWithPopup(auth, googleProvider, browserPopupRedirectResolver);
-        if (!res?.user) return;
-
-        const idToken = await res.user.getIdToken();
-        setToken(idToken);
-        localStorage.setItem('craft_ai_token', idToken);
-
-        let profile: UserProfile = {
-          uid: res.user.uid,
-          name: res.user.displayName || res.user.email?.split('@')[0] || 'User',
-          email: res.user.email || '',
-          photoUrl: res.user.photoURL || '',
-          role: res.user.email?.toLowerCase().includes('admin') ? 'admin' : 'user',
-          plan: res.user.email?.toLowerCase().includes('admin') ? 'Administrator' : 'Free User',
-          createdAt: new Date().toISOString(),
-          lastLoginAt: new Date().toISOString(),
-        };
-
-        if (db) {
-          try {
-            const userRef = doc(db, 'users', res.user.uid);
-            const userSnap = await withTimeout(getDoc(userRef), 1500);
-            if (userSnap.exists()) {
-              const data = userSnap.data();
-              profile = {
-                ...profile,
-                name: data.name || profile.name,
-                photoUrl: data.photoUrl || profile.photoUrl,
-                role: data.role || profile.role,
-                plan: data.plan || profile.plan,
-                createdAt: data.createdAt || profile.createdAt,
-              };
-              withTimeout(setDoc(userRef, { lastLoginAt: new Date().toISOString() }, { merge: true }), 1200).catch(() => {});
-            } else {
-              withTimeout(setDoc(userRef, profile, { merge: true }), 1200).catch(() => {});
-            }
-          } catch (fsErr) {
-            console.warn('[Firestore Client] Notice:', fsErr);
-          }
-        }
-
-        setUser(profile);
-        if (profile.photoUrl) {
-          setUserPhotoUrl(profile.photoUrl);
-          localStorage.setItem('craft_ai_photo', profile.photoUrl);
-        }
-        localStorage.setItem('craft_ai_user', JSON.stringify(profile));
-        realtimeStore.saveUser(profile).catch(() => {});
-      } catch (err: any) {
-        if (
-          err?.code === 'auth/popup-closed-by-user' ||
-          err?.code === 'auth/cancelled-popup-request'
-        ) {
-          return;
-        }
-        console.warn('[Auth] Popup blocked or failed, falling back to redirect:', err);
-        await signInWithRedirect(auth, googleProvider);
-      }
+      console.log('[Auth] Initiating Google signInWithRedirect...');
+      await signInWithRedirect(auth, googleProvider);
     } else {
       throw new Error('Firebase Auth not available.');
     }
