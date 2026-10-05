@@ -23,9 +23,14 @@ export function formatAuthError(error: any): string | null {
     return 'Sign-in popup was blocked by your browser. Please allow popups for this site.';
   }
 
-  // Operation not allowed (e.g. Google provider not enabled in console)
+  // Operation not allowed (e.g. Email/Password or Google provider not enabled in console)
   if (code === 'auth/operation-not-allowed' || message.includes('operation-not-allowed')) {
-    return 'Google Sign-In is not enabled yet in your Firebase Console. Please enable Google under Authentication > Sign-in method.';
+    return 'Sign-In method is not enabled in Firebase Console. Go to Firebase > Authentication > Sign-in method, and enable "Email/Password" and "Google".';
+  }
+
+  // Domain not authorized in Firebase Console
+  if (code === 'auth/unauthorized-domain' || message.includes('unauthorized-domain')) {
+    return 'Domain not authorized. Please add "craftaiapp.netlify.app" in Firebase Console under Authentication > Settings > Authorized domains.';
   }
 
   // Credentials / Login errors
