@@ -15,6 +15,7 @@ import {
   Auth,
 } from 'firebase/auth';
 import {
+  initializeFirestore,
   getFirestore,
   Firestore,
   doc,
@@ -58,7 +59,16 @@ if (isFirebaseConfigured) {
   try {
     app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
     auth = getAuth(app);
-    db = getFirestore(app);
+    
+    // Use Long Polling to prevent ERR_QUIC_PROTOCOL_ERROR on certain ISPs & browsers
+    try {
+      db = initializeFirestore(app, {
+        experimentalForceLongPolling: true,
+      });
+    } catch {
+      db = getFirestore(app);
+    }
+    
     console.log('[Firebase] Initialized purely from .env file for project:', firebaseConfig.projectId);
 
     if (typeof window !== 'undefined' && firebaseConfig.measurementId) {
