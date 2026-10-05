@@ -303,87 +303,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Real Google OAuth Login with Firebase & Firestore database
+  // Real Google OAuth Login with Firebase & Firestore database (Uses Redirect to avoid COOP popup deadlock)
   const loginWithGoogle = async () => {
     if (isFirebaseConfigured && auth) {
-      let res;
-      try {
-        res = await signInWithPopup(auth, googleProvider);
-      } catch (popupErr: any) {
-        // User closed the popup intentionally
-        if (
-          popupErr?.code === 'auth/popup-closed-by-user' ||
-          popupErr?.code === 'auth/cancelled-popup-request'
-        ) {
-          return;
-        }
-        // If popup was blocked or cross-origin popup storage issue on Edge/Safari, redirect
-        if (
-          popupErr?.code === 'auth/popup-blocked' ||
-          popupErr?.code === 'auth/unauthorized-domain' ||
-          popupErr?.message?.toLowerCase().includes('popup')
-        ) {
-          console.warn('[Auth] Falling back to signInWithRedirect:', popupErr);
-          await signInWithRedirect(auth, googleProvider);
-          return;
-        }
-        throw popupErr;
-      }
-
-      if (!res?.user) return;
-
-      const idToken = await res.user.getIdToken();
-      setToken(idToken);
-      localStorage.setItem('craft_ai_token', idToken);
-
-      let profile: UserProfile = {
-        uid: res.user.uid,
-        name: res.user.displayName || res.user.email?.split('@')[0] || 'User',
-        email: res.user.email || '',
-        photoUrl: res.user.photoURL || '',  // only use Google's own photo, never stale state
-        role: res.user.email?.toLowerCase().includes('admin') ? 'admin' : 'user',
-        plan: res.user.email?.toLowerCase().includes('admin') ? 'Administrator' : 'Free User',
-        createdAt: new Date().toISOString(),
-        lastLoginAt: new Date().toISOString(),
-      };
-
-      if (db) {
-        try {
-          const userRef = doc(db, 'users', res.user.uid);
-          const userSnap = await withTimeout(getDoc(userRef), 1200);
-          if (userSnap.exists()) {
-            const data = userSnap.data();
-            profile = {
-              ...profile,
-              name: data.name || profile.name,
-              photoUrl: data.photoUrl || profile.photoUrl,
-              role: data.role || profile.role,
-              plan: data.plan || profile.plan,
-              createdAt: data.createdAt || profile.createdAt,
-            };
-            withTimeout(setDoc(userRef, { lastLoginAt: new Date().toISOString() }, { merge: true }), 1200).catch(() => {});
-          } else {
-            withTimeout(setDoc(userRef, profile, { merge: true }), 1200).catch(() => {});
-          }
-        } catch (fsErr) {
-          console.warn('[Firestore Client] Permission notice (handled):', fsErr);
-        }
-      }
-
-      // Sync with backend asynchronously without blocking navigation
-      fetch('/api/users/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(profile),
-      }).catch(() => {});
-
-      setUser(profile);
-      if (profile.photoUrl) {
-        setUserPhotoUrl(profile.photoUrl);
-        localStorage.setItem('craft_ai_photo', profile.photoUrl);
-      }
-      localStorage.setItem('craft_ai_user', JSON.stringify(profile));
-      realtimeStore.saveUser(profile).catch(() => {});
+      await signInWithRedirect(auth, googleProvider);
     } else {
       throw new Error('Firebase Auth not available.');
     }
