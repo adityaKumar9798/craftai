@@ -13,7 +13,8 @@ export class ApiService {
   static async getCategories(): Promise<Category[]> {
     try {
       const res = await fetch(`${API_BASE}/categories`);
-      if (!res.ok) throw new Error('Failed to fetch categories');
+      const contentType = res.headers.get('content-type') || '';
+      if (!res.ok || !contentType.includes('application/json')) return [];
       const data = await res.json();
       return data.data || [];
     } catch {
@@ -35,7 +36,8 @@ export class ApiService {
       if (params?.tag) url.searchParams.set('tag', params.tag);
 
       const res = await fetch(url.toString());
-      if (!res.ok) throw new Error('Failed to fetch templates');
+      const contentType = res.headers.get('content-type') || '';
+      if (!res.ok || !contentType.includes('application/json')) return [];
       const data = await res.json();
       return data.data || [];
     } catch {
@@ -46,7 +48,8 @@ export class ApiService {
   static async getTemplateById(id: string): Promise<Template | null> {
     try {
       const res = await fetch(`${API_BASE}/templates/${id}`);
-      if (!res.ok) throw new Error('Not found');
+      const contentType = res.headers.get('content-type') || '';
+      if (!res.ok || !contentType.includes('application/json')) return null;
       const data = await res.json();
       return data.data;
     } catch {

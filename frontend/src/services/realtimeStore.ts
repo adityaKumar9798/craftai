@@ -77,12 +77,11 @@ class RealtimeStore {
   }
 
   // --- Backend API polling for topics (bypasses Firestore security rules) ---
-  private topicsPollTimer: ReturnType<typeof setInterval> | null = null;
-
   private async fetchTopicsFromAPI() {
     try {
       const res = await fetch('/api/trending');
-      if (res.ok) {
+      const contentType = res.headers.get('content-type') || '';
+      if (res.ok && contentType.includes('application/json')) {
         const data = await res.json();
         if (data.success && Array.isArray(data.data)) {
           const topics: TrendingTopic[] = data.data;
@@ -94,17 +93,29 @@ class RealtimeStore {
         }
       }
     } catch (e) {
-      console.warn('[RealtimeStore] Could not fetch trending topics from API:', e);
+      // Backend not running on static hosts like Netlify (handled silently)
     }
   }
 
   private listenToFirestoreTopics() {
-    // Initial fetch
+    if (db) {
+      try {
+        onSnapshot(collection(db, 'trending_topics'), (snapshot) => {
+          const topics: TrendingTopic[] = [];
+          snapshot.forEach((d) => {
+            topics.push({ id: d.id, ...d.data() } as TrendingTopic);
+          });
+          if (topics.length > 0) {
+            topics.sort((a, b) => (a.order || 0) - (b.order || 0));
+            this.cachedTopics = topics;
+            this.topicsLoaded = true;
+            this.broadcast('TOPICS_UPDATED', topics);
+          }
+        }, () => {});
+      } catch (e) {}
+    }
+    // Initial fetch from API if available
     this.fetchTopicsFromAPI();
-    // Poll every 5 seconds for near-real-time sync
-    this.topicsPollTimer = setInterval(() => {
-      this.fetchTopicsFromAPI();
-    }, 5000);
   }
 
   // --- Firestore real-time listener for templates ---
@@ -153,7 +164,8 @@ class RealtimeStore {
     const fetchBackendUsers = async () => {
       try {
         const res = await fetch('/api/users/list');
-        if (res.ok) {
+        const contentType = res.headers.get('content-type') || '';
+        if (res.ok && contentType.includes('application/json')) {
           const data = await res.json();
           if (data.success && Array.isArray(data.data)) {
             const realUsers = data.data.filter((u: any) => !u.uid?.startsWith('usr_'));
