@@ -11,6 +11,9 @@ import {
   signOut,
   onAuthStateChanged,
   updateProfile as updateFirebaseProfile,
+  setPersistence,
+  browserLocalPersistence,
+  browserPopupRedirectResolver,
   User as FirebaseUser,
   Auth,
 } from 'firebase/auth';
@@ -59,6 +62,9 @@ if (isFirebaseConfigured) {
   try {
     app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
     auth = getAuth(app);
+    try {
+      setPersistence(auth, browserLocalPersistence).catch(() => {});
+    } catch {}
     
     // Use Long Polling to prevent ERR_QUIC_PROTOCOL_ERROR on certain ISPs & browsers
     try {
@@ -115,5 +121,7 @@ export {
   signOut,
   onAuthStateChanged,
   updateFirebaseProfile,
+  browserPopupRedirectResolver,
+  browserLocalPersistence,
 };
 export type { FirebaseUser };

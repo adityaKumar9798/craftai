@@ -18,6 +18,7 @@ import {
   onAuthStateChanged,
   updateFirebaseProfile,
   isFirebaseConfigured,
+  browserPopupRedirectResolver,
 } from '../firebase/firebase';
 
 interface AuthContextType {
@@ -80,13 +81,58 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (isFirebaseConfigured && auth) {
       // Catch Google redirect login result if redirect flow was used
       getRedirectResult(auth)
-        .then((result) => {
+        .then(async (result) => {
           if (result && result.user) {
-            console.log('[Auth] Google Redirect successful:', result.user.email);
+            console.log('[Auth] Google Redirect result detected for:', result.user.email);
+            const idToken = await result.user.getIdToken();
+            setToken(idToken);
+            localStorage.setItem('craft_ai_token', idToken);
+
+            let profile: UserProfile = {
+              uid: result.user.uid,
+              name: result.user.displayName || result.user.email?.split('@')[0] || 'User',
+              email: result.user.email || '',
+              photoUrl: result.user.photoURL || '',
+              role: result.user.email?.toLowerCase().includes('admin') ? 'admin' : 'user',
+              plan: result.user.email?.toLowerCase().includes('admin') ? 'Administrator' : 'Free User',
+              createdAt: new Date().toISOString(),
+              lastLoginAt: new Date().toISOString(),
+            };
+
+            if (db) {
+              try {
+                const userRef = doc(db, 'users', result.user.uid);
+                const snapshot = await withTimeout(getDoc(userRef), 1500);
+                if (snapshot.exists()) {
+                  const data = snapshot.data();
+                  profile = {
+                    ...profile,
+                    name: data.name || profile.name,
+                    photoUrl: data.photoUrl || profile.photoUrl,
+                    role: data.role || profile.role,
+                    plan: data.plan || profile.plan,
+                    createdAt: data.createdAt || profile.createdAt,
+                  };
+                  withTimeout(setDoc(userRef, { lastLoginAt: new Date().toISOString() }, { merge: true }), 1200).catch(() => {});
+                } else {
+                  withTimeout(setDoc(userRef, profile, { merge: true }), 1200).catch(() => {});
+                }
+              } catch (fsErr) {
+                console.warn('[Firestore Client] Redirect Notice:', fsErr);
+              }
+            }
+
+            setUser(profile);
+            if (profile.photoUrl) {
+              setUserPhotoUrl(profile.photoUrl);
+              localStorage.setItem('craft_ai_photo', profile.photoUrl);
+            }
+            localStorage.setItem('craft_ai_user', JSON.stringify(profile));
+            realtimeStore.saveUser(profile).catch(() => {});
           }
         })
         .catch((err) => {
-          console.warn('[Auth] Redirect result check notice:', err);
+          console.warn('[Auth] Redirect result notice:', err);
         });
 
       const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
@@ -306,8 +352,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Real Google OAuth Login with Firebase & Firestore database
   const loginWithGoogle = async () => {
     if (isFirebaseConfigured && auth) {
+      // Mobile / DevTools Responsive Mode: Always use redirect because mobile viewports block multi-window popups
+      const isMobile = typeof window !== 'undefined' && (window.innerWidth <= 768 || 'ontouchstart' in window);
+
+      if (isMobile) {
+        console.log('[Auth] Mobile viewport detected: Using signInWithRedirect');
+        await signInWithRedirect(auth, googleProvider);
+        return;
+      }
+
+      // Desktop: Use popup with resolver and safe fallback
       try {
-        const res = await signInWithPopup(auth, googleProvider);
+        const res = await signInWithPopup(auth, googleProvider, browserPopupRedirectResolver);
         if (!res?.user) return;
 
         const idToken = await res.user.getIdToken();
@@ -348,12 +404,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         }
 
-        fetch('/api/users/sync', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(profile),
-        }).catch(() => {});
-
         setUser(profile);
         if (profile.photoUrl) {
           setUserPhotoUrl(profile.photoUrl);
@@ -368,11 +418,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         ) {
           return;
         }
-        if (err?.code === 'auth/popup-blocked') {
-          await signInWithRedirect(auth, googleProvider);
-          return;
-        }
-        throw err;
+        console.warn('[Auth] Popup blocked or failed, falling back to redirect:', err);
+        await signInWithRedirect(auth, googleProvider);
       }
     } else {
       throw new Error('Firebase Auth not available.');
