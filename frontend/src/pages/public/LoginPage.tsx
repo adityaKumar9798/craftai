@@ -16,7 +16,17 @@ export const LoginPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   const handlePostAuthRedirect = () => {
-    navigate('/home');
+    try {
+      const saved = localStorage.getItem('craft_ai_user');
+      if (saved) {
+        const u = JSON.parse(saved);
+        if (u.religion && u.username) {
+          navigate('/home');
+          return;
+        }
+      }
+    } catch {}
+    navigate('/setup-profile');
   };
 
   // Automatically navigate as soon as user state is populated

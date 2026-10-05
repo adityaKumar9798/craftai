@@ -79,7 +79,7 @@ export const App: React.FC = () => {
             <Route path="/signup" element={<SignupPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-            <Route path="/setup-profile" element={<PrivateRoute><ProfileSetupPage /></PrivateRoute>} />
+            <Route path="/setup-profile" element={<ProfileSetupPage />} />
 
             {/* ── SEMI-PROTECTED (part of post-login flow) ───────────── */}
             <Route path="/add-photo" element={<PrivateRoute><AddPhotoPage /></PrivateRoute>} />
