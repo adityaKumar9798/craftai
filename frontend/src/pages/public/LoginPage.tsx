@@ -119,7 +119,7 @@ export const LoginPage: React.FC = () => {
               <div className="space-y-1">
                 <input
                   type="text"
-                  placeholder="Enter Username"
+                  placeholder="Enter Username or Email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   autoComplete="off"

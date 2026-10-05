@@ -164,8 +164,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   // Real Email & Password Sign Up in Firebase Auth & Firestore database
-  const signup = async (name: string, email: string, pass: string) => {
+  const signup = async (name: string, emailOrUsername: string, pass: string) => {
     if (isFirebaseConfigured && auth) {
+      const email = emailOrUsername.trim().includes('@')
+        ? emailOrUsername.trim()
+        : `${emailOrUsername.trim().toLowerCase()}@craftai.com`;
+
       const cred = await createUserWithEmailAndPassword(auth, email, pass);
       const idToken = await cred.user.getIdToken();
       setToken(idToken);
@@ -220,8 +224,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // Real Email & Password Login with Firebase Auth & Firestore database
-  const login = async (email: string, pass: string) => {
+  const login = async (emailOrUsername: string, pass: string) => {
     if (isFirebaseConfigured && auth) {
+      const email = emailOrUsername.trim().includes('@')
+        ? emailOrUsername.trim()
+        : `${emailOrUsername.trim().toLowerCase()}@craftai.com`;
+
       const cred = await signInWithEmailAndPassword(auth, email, pass);
       const idToken = await cred.user.getIdToken();
       setToken(idToken);
