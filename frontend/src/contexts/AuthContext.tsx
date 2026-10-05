@@ -526,8 +526,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const isAuthenticated = Boolean(user);
-  const isAdmin = user?.role === 'admin';
+  const isAuthenticated = Boolean(user || token || localStorage.getItem('craft_ai_user') || localStorage.getItem('craft_ai_token'));
+  const isAdmin = Boolean(user?.role === 'admin' || (typeof localStorage !== 'undefined' && localStorage.getItem('craft_ai_user')?.includes('"role":"admin"')));
 
   return (
     <AuthContext.Provider

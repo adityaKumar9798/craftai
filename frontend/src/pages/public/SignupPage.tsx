@@ -20,17 +20,7 @@ export const SignupPage: React.FC = () => {
   // Automatically navigate as soon as user is authenticated
   useEffect(() => {
     if (user) {
-      try {
-        const saved = localStorage.getItem('craft_ai_user');
-        if (saved) {
-          const u = JSON.parse(saved);
-          if (u.religion && u.username) {
-            navigate('/home');
-            return;
-          }
-        }
-      } catch {}
-      navigate('/setup-profile');
+      navigate('/home');
     }
   }, [user, navigate]);
 
