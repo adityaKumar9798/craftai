@@ -68,6 +68,7 @@ export const SignupPage: React.FC = () => {
       console.error('[SignupPage] Google signup failed:', err);
       const msg = formatAuthError(err);
       if (msg) setError(msg);
+    } finally {
       setLoading(false);
     }
   };

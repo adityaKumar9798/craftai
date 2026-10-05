@@ -66,6 +66,7 @@ export const LoginPage: React.FC = () => {
       console.error('[LoginPage] Google sign-in failed:', err);
       const msg = formatAuthError(err);
       if (msg) setError(msg);
+    } finally {
       setLoading(false);
     }
   };
