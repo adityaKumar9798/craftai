@@ -9,6 +9,8 @@ import {
   getDoc,
   googleProvider,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
@@ -76,6 +78,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Sync with real-time Firebase Auth state
   useEffect(() => {
     if (isFirebaseConfigured && auth) {
+      // Catch Google redirect login result if redirect flow was used
+      getRedirectResult(auth)
+        .then((result) => {
+          if (result && result.user) {
+            console.log('[Auth] Google Redirect successful:', result.user.email);
+          }
+        })
+        .catch((err) => {
+          console.warn('[Auth] Redirect result check notice:', err);
+        });
+
       const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
         if (fbUser) {
           try {
@@ -99,11 +112,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               lastLoginAt: new Date().toISOString(),
             };
 
-            // Safely fetch or update real user document in Firebase Firestore
+            // Safely fetch or update real user document in Firebase Firestore (with 1500ms timeout)
             if (db) {
               try {
                 const userRef = doc(db, 'users', fbUser.uid);
-                const snapshot = await getDoc(userRef);
+                const snapshot = await withTimeout(getDoc(userRef), 1500);
 
                 if (snapshot.exists()) {
                   const data = snapshot.data();
@@ -116,9 +129,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     plan: data.plan || profile.plan,
                     createdAt: data.createdAt || profile.createdAt,
                   };
-                  await setDoc(userRef, { lastLoginAt: new Date().toISOString() }, { merge: true });
+                  withTimeout(setDoc(userRef, { lastLoginAt: new Date().toISOString() }, { merge: true }), 1200).catch(() => {});
                 } else {
-                  await setDoc(userRef, profile, { merge: true });
+                  withTimeout(setDoc(userRef, profile, { merge: true }), 1200).catch(() => {});
                   console.log('[Firestore] Real user document created in database:', fbUser.uid);
                 }
               } catch (fsErr) {
@@ -128,11 +141,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
             // Sync with backend Firebase Admin SDK (which bypasses client security rules)
             try {
-              await fetch('/api/users/sync', {
+              fetch('/api/users/sync', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(profile),
-              });
+              }).catch(() => {});
             } catch {}
 
             setUser(profile);
@@ -141,7 +154,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               localStorage.setItem('craft_ai_photo', profile.photoUrl);
             }
             localStorage.setItem('craft_ai_user', JSON.stringify(profile));
-            await realtimeStore.saveUser(profile);
+            realtimeStore.saveUser(profile).catch(() => {});
           } catch (e) {
             console.warn('[Auth] Error setting up user:', e);
           }
@@ -293,7 +306,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Real Google OAuth Login with Firebase & Firestore database
   const loginWithGoogle = async () => {
     if (isFirebaseConfigured && auth) {
-      const res = await signInWithPopup(auth, googleProvider);
+      let res;
+      try {
+        res = await signInWithPopup(auth, googleProvider);
+      } catch (popupErr: any) {
+        // User closed the popup intentionally
+        if (
+          popupErr?.code === 'auth/popup-closed-by-user' ||
+          popupErr?.code === 'auth/cancelled-popup-request'
+        ) {
+          return;
+        }
+        // If popup was blocked or cross-origin popup storage issue on Edge/Safari, redirect
+        if (
+          popupErr?.code === 'auth/popup-blocked' ||
+          popupErr?.code === 'auth/unauthorized-domain' ||
+          popupErr?.message?.toLowerCase().includes('popup')
+        ) {
+          console.warn('[Auth] Falling back to signInWithRedirect:', popupErr);
+          await signInWithRedirect(auth, googleProvider);
+          return;
+        }
+        throw popupErr;
+      }
+
+      if (!res?.user) return;
+
       const idToken = await res.user.getIdToken();
       setToken(idToken);
       localStorage.setItem('craft_ai_token', idToken);

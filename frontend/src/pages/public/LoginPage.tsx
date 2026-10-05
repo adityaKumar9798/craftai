@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
 import { Logo } from '../../components/common/Logo';
@@ -7,7 +7,7 @@ import { formatAuthError } from '../../utils/authErrors';
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const { login, loginWithGoogle } = useAuth();
+  const { user, login, loginWithGoogle } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -28,6 +28,13 @@ export const LoginPage: React.FC = () => {
     } catch {}
     navigate('/setup-profile');
   };
+
+  // Automatically navigate as soon as user state is populated
+  useEffect(() => {
+    if (user) {
+      handlePostAuthRedirect();
+    }
+  }, [user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

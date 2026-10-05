@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
 import { Logo } from '../../components/common/Logo';
@@ -7,7 +7,7 @@ import { formatAuthError } from '../../utils/authErrors';
 
 export const SignupPage: React.FC = () => {
   const navigate = useNavigate();
-  const { signup, loginWithGoogle } = useAuth();
+  const { user, signup, loginWithGoogle } = useAuth();
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -16,6 +16,23 @@ export const SignupPage: React.FC = () => {
   const [agreeTerms, setAgreeTerms] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Automatically navigate as soon as user is authenticated
+  useEffect(() => {
+    if (user) {
+      try {
+        const saved = localStorage.getItem('craft_ai_user');
+        if (saved) {
+          const u = JSON.parse(saved);
+          if (u.religion && u.username) {
+            navigate('/home');
+            return;
+          }
+        }
+      } catch {}
+      navigate('/setup-profile');
+    }
+  }, [user, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
