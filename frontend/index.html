@@ -11,25 +11,16 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-    <!-- Global Netlify Badge and Drawer Blocker -->
+    <!-- Netlify Badge & Drawer Hider (Only targets external injected elements outside React #root) -->
     <style>
-      netlify-drawer,
-      .netlify-drawer,
-      #netlify-drawer,
-      [data-netlify-drawer],
-      [data-netlify-badge],
-      #netlify-feedback-widget,
-      [id*="netlify"],
-      iframe[src*="netlify"],
-      iframe#netlify-drawer,
-      iframe[title*="Netlify"],
-      a[href*="netlify.com"],
-      a[href*="netlify.app"],
-      img[src*="netlify.com"],
-      img[src*="api.netlify.com"],
-      img[alt*="Netlify"],
-      div:has(> a[href*="netlify.com"]),
-      div:has(> a[href*="netlify.app"]) {
+      body > netlify-drawer,
+      body > .netlify-drawer,
+      body > #netlify-drawer,
+      body > iframe[src*="netlify"],
+      body > #netlify-feedback-widget,
+      body > [data-netlify-drawer],
+      body > [data-netlify-badge],
+      body > div:not(#root) {
         display: none !important;
         visibility: hidden !important;
         opacity: 0 !important;
@@ -39,72 +30,31 @@
         left: -99999px !important;
         width: 0 !important;
         height: 0 !important;
-        z-index: -999999 !important;
+        z-index: -99999 !important;
       }
     </style>
 
     <script>
       (function() {
-        function removeNetlifyElements() {
+        function removeExternalNetlifyInjections() {
           try {
-            // 1. Target known Netlify selectors
-            const selectors = [
-              'netlify-drawer',
-              '.netlify-drawer',
-              '#netlify-drawer',
-              '[data-netlify-drawer]',
-              '[data-netlify-badge]',
-              '#netlify-feedback-widget',
-              'iframe[src*="netlify"]',
-              'iframe#netlify-drawer',
-              'iframe[title*="Netlify"]',
-              'a[href*="netlify.com"]',
-              'a[href*="netlify.app"]',
-              'img[src*="api.netlify.com"]',
-              'img[alt*="Netlify"]'
-            ];
-
-            selectors.forEach(function(sel) {
-              var nodes = document.querySelectorAll(sel);
-              for (var i = 0; i < nodes.length; i++) {
-                var el = nodes[i];
-                var parentPill = el.closest('div, a, footer, aside, section');
-                if (parentPill && parentPill !== document.body && parentPill !== document.documentElement && parentPill.id !== 'root') {
-                  parentPill.style.display = 'none';
-                  parentPill.remove();
-                } else {
-                  el.style.display = 'none';
-                  el.remove();
-                }
-              }
-            });
-
-            // 2. Target any container element with text "Powered by Netlify"
-            var allElements = document.querySelectorAll('div, a, span, button, footer, p');
-            for (var j = 0; j < allElements.length; j++) {
-              var elem = allElements[j];
-              if (elem.id !== 'root' && elem !== document.body && elem.children.length <= 4) {
-                var text = (elem.innerText || elem.textContent || '').trim().toLowerCase();
-                if (text.includes('powered by netlify') || text === 'netlify' || text.includes('deploy status')) {
-                  elem.style.display = 'none';
-                  elem.style.visibility = 'hidden';
-                  elem.style.opacity = '0';
-                  elem.style.pointerEvents = 'none';
-                  elem.remove();
-                }
+            var children = document.body.children;
+            for (var i = children.length - 1; i >= 0; i--) {
+              var el = children[i];
+              if (el && el.id !== 'root' && el.tagName !== 'SCRIPT' && el.tagName !== 'LINK' && el.tagName !== 'STYLE') {
+                el.style.display = 'none';
+                try { el.remove(); } catch(e) {}
               }
             }
-          } catch (err) {}
+          } catch(err) {}
         }
 
         if (typeof window !== 'undefined') {
-          document.addEventListener('DOMContentLoaded', removeNetlifyElements);
-          window.addEventListener('load', removeNetlifyElements);
-          setInterval(removeNetlifyElements, 250);
-
+          document.addEventListener('DOMContentLoaded', removeExternalNetlifyInjections);
+          window.addEventListener('load', removeExternalNetlifyInjections);
+          setInterval(removeExternalNetlifyInjections, 500);
           if (window.MutationObserver) {
-            var observer = new MutationObserver(removeNetlifyElements);
-            observer.observe(document.documentElement, { childList: true, subtree: true });
+            new MutationObserver(removeExternalNetlifyInjections).observe(document.body, { childList: true });
           }
         }
       })();

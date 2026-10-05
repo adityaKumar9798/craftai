@@ -69,31 +69,15 @@ body {
   background: #9ca3af;
 }
 
-/* ==========================================================================
-   Global Netlify Badge & Widget Hider
-   ========================================================================== */
-a[href*="netlify.com"],
-a[href*="app.netlify.com"],
-img[src*="api.netlify.com"],
-img[src*="netlify.com"],
-img[alt*="Netlify Status"],
-img[alt*="Netlify"],
-[data-netlify-deploy-status],
+/* Netlify drawer / widget hider */
 netlify-drawer,
 .netlify-drawer,
 #netlify-drawer,
 #netlify-feedback-widget,
-[id*="netlify-drawer"],
-[class*="netlify-badge"],
-[aria-label*="Netlify"] {
+[data-netlify-deploy-status] {
   display: none !important;
   visibility: hidden !important;
   opacity: 0 !important;
   pointer-events: none !important;
-  position: absolute !important;
-  top: -9999px !important;
-  left: -9999px !important;
-  width: 0 !important;
-  height: 0 !important;
 }
 
