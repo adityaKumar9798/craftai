@@ -394,8 +394,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Real Google OAuth Login with Firebase & Firestore database
   const loginWithGoogle = async (): Promise<UserProfile | null> => {
     if (isFirebaseConfigured && auth) {
-      console.log('[Auth] Initiating Google popup sign-in...');
-      const res = await signInWithPopup(auth, googleProvider);
+      console.log('[Auth] Initiating Google sign-in...');
+      let res: any = null;
+      try {
+        res = await signInWithPopup(auth, googleProvider);
+      } catch (popupErr: any) {
+        console.warn('[Auth] Popup sign-in notice, attempting redirect flow fallback:', popupErr);
+        // If popup was blocked or closed due to COOP / domain policy, fallback to redirect
+        if (
+          popupErr.code === 'auth/popup-blocked' ||
+          popupErr.code === 'auth/popup-closed-by-user' ||
+          popupErr.code === 'auth/cancelled-popup-request' ||
+          popupErr.message?.includes('Cross-Origin-Opener-Policy')
+        ) {
+          try {
+            await signInWithRedirect(auth, googleProvider);
+            return null;
+          } catch (redErr) {
+            throw redErr;
+          }
+        }
+        throw popupErr;
+      }
+
       if (!res?.user) return null;
 
       const idToken = await res.user.getIdToken();
