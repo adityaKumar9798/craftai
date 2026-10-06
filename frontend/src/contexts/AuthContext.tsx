@@ -423,9 +423,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setToken(idToken);
       localStorage.setItem('craft_ai_token', idToken);
 
+      const cleanName = res.user.displayName || res.user.email?.split('@')[0] || 'User';
+      const cleanUsername = `@${cleanName.toLowerCase().replace(/[^a-z0-9_]/g, '_').slice(0, 15)}_${res.user.uid.slice(0, 4)}`;
+
       let profile: UserProfile = {
         uid: res.user.uid,
-        name: res.user.displayName || res.user.email?.split('@')[0] || 'User',
+        name: cleanName,
+        username: cleanUsername,
+        religion: 'hindu',
         email: res.user.email || '',
         photoUrl: res.user.photoURL || '',
         role: res.user.email?.toLowerCase().includes('admin') ? 'admin' : 'user',

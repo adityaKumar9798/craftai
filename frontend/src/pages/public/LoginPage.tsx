@@ -14,6 +14,7 @@ export const LoginPage: React.FC = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Verification handling
@@ -46,26 +47,12 @@ export const LoginPage: React.FC = () => {
     return () => clearInterval(timer);
   }, [countdown]);
 
-  const handlePostAuthRedirect = () => {
-    try {
-      const saved = localStorage.getItem('craft_ai_user');
-      if (saved) {
-        const u = JSON.parse(saved);
-        if (u.religion && u.username) {
-          navigate('/home');
-          return;
-        }
-      }
-    } catch {}
-    navigate('/setup-profile');
-  };
-
   // Automatically navigate as soon as user state is populated
   useEffect(() => {
     if (user) {
-      handlePostAuthRedirect();
+      navigate('/home');
     }
-  }, [user]);
+  }, [user, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,7 +67,7 @@ export const LoginPage: React.FC = () => {
       setIsUnverified(false);
       setResendMessage(null);
       await login(email.trim(), password);
-      handlePostAuthRedirect();
+      navigate('/home');
     } catch (err: any) {
       const msg = formatAuthError(err);
       if (err?.code === 'auth/unverified-email' || (msg && msg.toLowerCase().includes('not verified'))) {
@@ -109,24 +96,20 @@ export const LoginPage: React.FC = () => {
 
   const handleGoogleLogin = async () => {
     try {
-      setLoading(true);
+      setGoogleLoading(true);
       setError(null);
       setIsUnverified(false);
       console.log('[LoginPage] Initiating Google Sign-In...');
       const profile = await loginWithGoogle();
       if (profile) {
-        if (profile.religion && profile.username) {
-          navigate('/home');
-        } else {
-          navigate('/setup-profile');
-        }
+        navigate('/home');
       }
     } catch (err: any) {
       console.error('[LoginPage] Google sign-in failed:', err);
       const msg = formatAuthError(err);
       if (msg) setError(msg);
     } finally {
-      setLoading(false);
+      setGoogleLoading(false);
     }
   };
 
@@ -265,15 +248,20 @@ export const LoginPage: React.FC = () => {
               <button
                 type="button"
                 onClick={handleGoogleLogin}
-                className="flex h-12 w-12 items-center justify-center rounded-full border border-gray-200 bg-white hover:bg-gray-50 transition shadow-2xs active:scale-95"
+                disabled={googleLoading}
+                className="flex h-12 w-12 items-center justify-center rounded-full border border-gray-200 bg-white hover:bg-gray-50 transition shadow-2xs active:scale-95 disabled:opacity-50"
                 title="Google Sign In"
               >
-                <svg className="w-5 h-5" viewBox="0 0 24 24">
-                  <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17Z"/>
-                  <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24Z"/>
-                  <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15Z"/>
-                  <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98Z"/>
-                </svg>
+                {googleLoading ? (
+                  <RefreshCw className="w-5 h-5 text-purple-600 animate-spin" />
+                ) : (
+                  <svg className="w-5 h-5" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17Z"/>
+                    <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24Z"/>
+                    <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15Z"/>
+                    <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98Z"/>
+                  </svg>
+                )}
               </button>
 
               <button
