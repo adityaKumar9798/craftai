@@ -13,6 +13,12 @@ export const HomeDashboard: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [showReligionSelector, setShowReligionSelector] = useState(false);
 
+  React.useEffect(() => {
+    if (user && (!user.religion || !user.username)) {
+      navigate('/setup-profile');
+    }
+  }, [user, navigate]);
+
   const firstName = user?.firstName || user?.name?.split(' ')[0] || user?.email?.split('@')[0] || 'User';
   const userReligion: ReligionType = user?.religion || 'hindu';
 

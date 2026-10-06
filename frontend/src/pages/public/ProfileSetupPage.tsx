@@ -235,14 +235,17 @@ export const ProfileSetupPage: React.FC = () => {
 
               {/* User ID Input (Exact same styling as login input) */}
               <div className="space-y-1">
-                <input
-                  type="text"
-                  placeholder="Enter User ID (e.g. rohit_01)"
-                  value={userId ? (userId.startsWith('@') ? userId : `@${userId}`) : ''}
-                  onChange={(e) => setUserId(e.target.value.replace(/[^a-zA-Z0-9_]/g, ''))}
-                  className="w-full px-5 py-4 rounded-2xl border border-gray-300 bg-white text-base sm:text-lg text-gray-900 placeholder-gray-400 placeholder:text-base focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent transition shadow-2xs font-medium"
-                  required
-                />
+                <div className="relative flex items-center">
+                  <span className="absolute left-5 text-gray-400 font-bold text-base sm:text-lg pointer-events-none select-none">@</span>
+                  <input
+                    type="text"
+                    placeholder="choose_username (e.g. rohit_01)"
+                    value={userId.replace(/^@/, '')}
+                    onChange={(e) => setUserId(e.target.value.replace(/^@/, '').replace(/[^a-zA-Z0-9_]/g, ''))}
+                    className="w-full pl-10 pr-5 py-4 rounded-2xl border border-gray-300 bg-white text-base sm:text-lg text-gray-900 placeholder-gray-400 placeholder:text-base focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent transition shadow-2xs font-medium"
+                    required
+                  />
+                </div>
               </div>
 
               {/* Next Button (Exact same styling as login button) */}

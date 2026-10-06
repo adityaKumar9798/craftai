@@ -104,20 +104,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (db) {
               try {
                 const userRef = doc(db, 'users', result.user.uid);
-                const snapshot = await withTimeout(getDoc(userRef), 1500);
+                const snapshot = await withTimeout(getDoc(userRef), 2000);
                 if (snapshot.exists()) {
                   const data = snapshot.data();
                   profile = {
                     ...profile,
+                    ...data,
+                    uid: result.user.uid,
                     name: data.name || profile.name,
+                    firstName: data.firstName || profile.firstName,
+                    lastName: data.lastName || profile.lastName,
+                    username: data.username || profile.username,
+                    religion: data.religion || profile.religion,
+                    privacyAccepted: data.privacyAccepted !== undefined ? data.privacyAccepted : profile.privacyAccepted,
+                    onboardingCompleted: data.onboardingCompleted !== undefined ? data.onboardingCompleted : profile.onboardingCompleted,
                     photoUrl: data.photoUrl || profile.photoUrl,
                     role: data.role || profile.role,
                     plan: data.plan || profile.plan,
                     createdAt: data.createdAt || profile.createdAt,
                   };
-                  withTimeout(setDoc(userRef, { lastLoginAt: new Date().toISOString() }, { merge: true }), 1200).catch(() => {});
+                  withTimeout(setDoc(userRef, { lastLoginAt: new Date().toISOString() }, { merge: true }), 1500).catch(() => {});
                 } else {
-                  withTimeout(setDoc(userRef, profile, { merge: true }), 1200).catch(() => {});
+                  withTimeout(setDoc(userRef, profile, { merge: true }), 1500).catch(() => {});
                 }
               } catch (fsErr) {
                 console.warn('[Firestore Client] Redirect Notice:', fsErr);
@@ -173,26 +181,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               lastLoginAt: new Date().toISOString(),
             };
 
-            // Safely fetch or update real user document in Firebase Firestore (with 1500ms timeout)
+            // Safely fetch or update real user document in Firebase Firestore
             if (db) {
               try {
                 const userRef = doc(db, 'users', fbUser.uid);
-                const snapshot = await withTimeout(getDoc(userRef), 1500);
+                const snapshot = await withTimeout(getDoc(userRef), 2000);
 
                 if (snapshot.exists()) {
                   const data = snapshot.data();
                   profile = {
                     ...profile,
+                    ...data,
+                    uid: fbUser.uid,
                     name: data.name || profile.name,
+                    firstName: data.firstName || profile.firstName,
+                    lastName: data.lastName || profile.lastName,
+                    username: data.username || profile.username,
+                    religion: data.religion || profile.religion,
+                    privacyAccepted: data.privacyAccepted !== undefined ? data.privacyAccepted : profile.privacyAccepted,
+                    onboardingCompleted: data.onboardingCompleted !== undefined ? data.onboardingCompleted : profile.onboardingCompleted,
                     email: data.email || profile.email,
                     photoUrl: savedPhoto || data.photoUrl || profile.photoUrl,
                     role: data.role || profile.role,
                     plan: data.plan || profile.plan,
                     createdAt: data.createdAt || profile.createdAt,
                   };
-                  withTimeout(setDoc(userRef, { lastLoginAt: new Date().toISOString() }, { merge: true }), 1200).catch(() => {});
+                  withTimeout(setDoc(userRef, { lastLoginAt: new Date().toISOString() }, { merge: true }), 1500).catch(() => {});
                 } else {
-                  withTimeout(setDoc(userRef, profile, { merge: true }), 1200).catch(() => {});
+                  withTimeout(setDoc(userRef, profile, { merge: true }), 1500).catch(() => {});
                   console.log('[Firestore] Real user document created in database:', fbUser.uid);
                 }
               } catch (fsErr) {
@@ -437,39 +453,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         lastLoginAt: new Date().toISOString(),
       };
 
-      // Set user immediately in state and storage so routing never lags
+      // Check Firestore to see if user has already chosen username/religion
+      if (db) {
+        try {
+          const userRef = doc(db, 'users', res.user.uid);
+          const snap = await withTimeout(getDoc(userRef), 2000);
+          if (snap.exists()) {
+            const data = snap.data();
+            profile = {
+              ...profile,
+              ...data,
+              uid: res.user.uid,
+              name: data.name || profile.name,
+              firstName: data.firstName || profile.firstName,
+              lastName: data.lastName || profile.lastName,
+              username: data.username || profile.username,
+              religion: data.religion || profile.religion,
+              privacyAccepted: data.privacyAccepted !== undefined ? data.privacyAccepted : profile.privacyAccepted,
+              onboardingCompleted: data.onboardingCompleted !== undefined ? data.onboardingCompleted : profile.onboardingCompleted,
+              photoUrl: data.photoUrl || profile.photoUrl,
+              role: data.role || profile.role,
+              plan: data.plan || profile.plan,
+            };
+            withTimeout(setDoc(userRef, { lastLoginAt: new Date().toISOString() }, { merge: true }), 1500).catch(() => {});
+          } else {
+            // Save newly created Google user profile in Firestore
+            await withTimeout(setDoc(userRef, profile, { merge: true }), 1500).catch(() => {});
+          }
+        } catch (fsErr) {
+          console.warn('[Firestore] Google login fetch notice:', fsErr);
+        }
+      }
+
+      // Set user immediately in state and storage
       setUser(profile);
       if (profile.photoUrl) {
         setUserPhotoUrl(profile.photoUrl);
         localStorage.setItem('craft_ai_photo', profile.photoUrl);
       }
       localStorage.setItem('craft_ai_user', JSON.stringify(profile));
-
-      // Asynchronously sync Firestore without blocking the UI
-      if (db) {
-        try {
-          const userRef = doc(db, 'users', res.user.uid);
-          getDoc(userRef).then((snap) => {
-            if (snap.exists()) {
-              const data = snap.data();
-              const merged = {
-                ...profile,
-                name: data.name || profile.name,
-                username: data.username || profile.username,
-                religion: data.religion || profile.religion,
-                photoUrl: data.photoUrl || profile.photoUrl,
-                role: data.role || profile.role,
-                plan: data.plan || profile.plan,
-              };
-              setUser(merged);
-              localStorage.setItem('craft_ai_user', JSON.stringify(merged));
-              setDoc(userRef, { lastLoginAt: new Date().toISOString() }, { merge: true }).catch(() => {});
-            } else {
-              setDoc(userRef, profile, { merge: true }).catch(() => {});
-            }
-          }).catch(() => {});
-        } catch {}
-      }
 
       fetch('/api/users/sync', {
         method: 'POST',

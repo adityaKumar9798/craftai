@@ -93,7 +93,11 @@ export const SignupPage: React.FC = () => {
       console.log('[SignupPage] Initiating Google Sign-In...');
       const profile = await loginWithGoogle();
       if (profile) {
-        navigate('/home');
+        if (profile.religion && profile.username) {
+          navigate('/home');
+        } else {
+          navigate('/setup-profile');
+        }
       }
     } catch (err: any) {
       console.error('[SignupPage] Google signup failed:', err);

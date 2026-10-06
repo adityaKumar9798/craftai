@@ -71,7 +71,7 @@ export const LoginPage: React.FC = () => {
       setIsUnverified(false);
       setResendMessage(null);
       await login(email.trim(), password);
-      navigate('/home');
+      // navigation is handled by useEffect or fallback here
     } catch (err: any) {
       const msg = formatAuthError(err);
       if (err?.code === 'auth/unverified-email' || (msg && msg.toLowerCase().includes('not verified'))) {
@@ -106,7 +106,11 @@ export const LoginPage: React.FC = () => {
       console.log('[LoginPage] Initiating Google Sign-In...');
       const profile = await loginWithGoogle();
       if (profile) {
-        navigate('/home');
+        if (profile.religion && profile.username) {
+          navigate('/home');
+        } else {
+          navigate('/setup-profile');
+        }
       }
     } catch (err: any) {
       console.error('[LoginPage] Google sign-in failed:', err);
