@@ -8,6 +8,7 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
+  sendEmailVerification,
   signOut,
   onAuthStateChanged,
   updateProfile as updateFirebaseProfile,
@@ -32,6 +33,8 @@ import {
   query,
   orderBy,
   where,
+  increment,
+  limit,
 } from 'firebase/firestore';
 
 // Pure environment variable loading - Zero hardcoded keys in source code
@@ -111,6 +114,8 @@ export {
   query,
   orderBy,
   where,
+  increment,
+  limit,
   googleProvider,
   signInWithPopup,
   signInWithRedirect,
@@ -118,6 +123,7 @@ export {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
+  sendEmailVerification,
   signOut,
   onAuthStateChanged,
   updateFirebaseProfile,

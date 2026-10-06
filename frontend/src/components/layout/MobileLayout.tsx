@@ -22,6 +22,7 @@ import {
   Heart,
   Settings,
   ChevronRight,
+  Download,
 } from 'lucide-react';
 import { Logo } from '../common/Logo';
 import { useAuth } from '../../contexts/AuthContext';
@@ -66,6 +67,7 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
     { label: 'Trending Topics', path: '/admin/trending-topics', icon: Flame },
     { label: 'Manage Posts', path: '/admin/posts', icon: ImageIcon },
     { label: 'Templates', path: '/admin/templates', icon: FileText },
+    { label: 'Downloads & Stats', path: '/admin/downloads', icon: Download },
     { label: 'Users', path: '/admin/users', icon: Users },
     { label: 'Categories', path: '/admin/categories', icon: Grid },
   ];

@@ -20,7 +20,7 @@ import { AdjustModal } from '../../components/modals/AdjustModal';
 export const FinalResultPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { templates, saveCreation } = useCreatives();
+  const { templates, saveCreation, recordDownload } = useCreatives();
   const { userPhotoUrl } = useAuth();
 
   const currentTemplate = templates.find((t) => t.id === id) || templates[0];
@@ -79,6 +79,7 @@ export const FinalResultPage: React.FC = () => {
         renderedDataUrl,
         `craft-ai-${currentTemplate.category}-${Date.now()}.png`
       );
+      recordDownload(currentTemplate.id, currentTemplate.name);
       setDownloadSuccess(true);
       setTimeout(() => setDownloadSuccess(false), 3000);
     }

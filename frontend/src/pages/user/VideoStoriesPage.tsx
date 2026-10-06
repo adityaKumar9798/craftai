@@ -4,9 +4,10 @@ import { useCreatives } from '../../contexts/CreativesContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { Template } from '../../types';
 import { ShareModal } from '../../components/modals/ShareModal';
+import { CanvasRenderer } from '../../services/canvasRenderer';
 
 export const VideoStoriesPage: React.FC = () => {
-  const { templates, isFavorite, toggleFavorite } = useCreatives();
+  const { templates, isFavorite, toggleFavorite, recordDownload, saveCreation } = useCreatives();
   const { userPhotoUrl } = useAuth();
 
   const [activeCategory, setActiveCategory] = useState<string>('all');
@@ -190,10 +191,31 @@ export const VideoStoriesPage: React.FC = () => {
             {/* Controls */}
             <div className="w-full mt-4 flex items-center gap-3">
               <button
-                onClick={() => {
-                  alert('Video downloaded! Rendering complete with audio.');
+                onClick={async () => {
+                  try {
+                    const dlUrl = selectedVideo.videoUrl || selectedVideo.assetUrl;
+                    const filename = `craft-ai-${selectedVideo.category}-${Date.now()}.mp4`;
+                    await CanvasRenderer.downloadDataUrl(dlUrl, filename);
+                    await recordDownload({
+                      templateId: selectedVideo.id,
+                      templateName: selectedVideo.name,
+                      category: selectedVideo.category,
+                      type: 'video',
+                      format: 'story',
+                    });
+                    saveCreation({
+                      templateId: selectedVideo.id,
+                      templateName: selectedVideo.name,
+                      category: selectedVideo.category,
+                      outputUrl: dlUrl,
+                      type: 'video',
+                    }).catch(() => {});
+                    alert('Video downloaded successfully! 🎉');
+                  } catch (e) {
+                    console.warn('Video download error:', e);
+                  }
                 }}
-                className="flex-1 py-3 rounded-xl brand-gradient text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-md"
+                className="flex-1 py-3 rounded-xl brand-gradient text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
               >
                 <Download className="w-4 h-4" /> Download Video
               </button>

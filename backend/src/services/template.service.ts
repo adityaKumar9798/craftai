@@ -96,4 +96,44 @@ export class TemplateService {
     }
     return false;
   }
+
+  static async createCategory(categoryData: Omit<Category, 'id'> & { id?: string }): Promise<Category> {
+    const slug = (categoryData.slug || categoryData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')).toLowerCase();
+    const newCategory: Category = {
+      ...categoryData,
+      id: categoryData.id || `cat-${slug}`,
+      slug,
+      order: typeof categoryData.order === 'number' ? categoryData.order : 99,
+      isPublished: categoryData.isPublished !== undefined ? categoryData.isPublished : true,
+      templateCount: categoryData.templateCount || 0,
+      backgroundColor: categoryData.backgroundColor || '#F3F4F6',
+      accentColor: categoryData.accentColor || '#6B7280',
+      icon: categoryData.icon || '📁',
+    };
+
+    if (isFirebaseConfigured && db) {
+      await db.collection('categories').doc(newCategory.id).set(newCategory, { merge: true });
+    }
+
+    return newCategory;
+  }
+
+  static async updateCategory(id: string, updates: Partial<Category>): Promise<Category | null> {
+    if (isFirebaseConfigured && db) {
+      await db.collection('categories').doc(id).set(updates, { merge: true });
+      const doc = await db.collection('categories').doc(id).get();
+      if (doc.exists) {
+        return { id: doc.id, ...(doc.data() as any) };
+      }
+    }
+    return null;
+  }
+
+  static async deleteCategory(id: string): Promise<boolean> {
+    if (isFirebaseConfigured && db) {
+      await db.collection('categories').doc(id).delete();
+      return true;
+    }
+    return false;
+  }
 }

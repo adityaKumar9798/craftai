@@ -40,20 +40,39 @@ export const HomeDashboard: React.FC = () => {
     return true;
   });
 
-  // Dynamic chips list from Admin-managed Trending Topics + User Religion
+  // Dynamic chips list from Admin-managed Categories & Trending Topics + User Religion
+  const publishedCats = (categories || [])
+    .filter((c) => c.isPublished !== false)
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
+
   const publishedTopics = (trendingTopics || [])
     .filter((t) => t.isPublished)
-    .sort((a, b) => a.order - b.order);
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
 
-  const chips = [
+  // Combine unique chips
+  const seenSlugs = new Set<string>(['all', userReligion]);
+  const chips: Array<{ label: string; value: string; icon: string }> = [
     { label: 'All', value: 'all', icon: '' },
     { label: `${currentRelMeta.icon} ${currentRelMeta.title}`, value: userReligion, icon: '' },
-    ...publishedTopics.map((topic) => ({
-      label: topic.name,
-      value: topic.slug || topic.name.toLowerCase().replace(/\s+/g, '-'),
-      icon: topic.icon || '',
-    })),
   ];
+
+  // Add trending topics
+  publishedTopics.forEach((t) => {
+    const slug = t.slug || t.name.toLowerCase().replace(/\s+/g, '-');
+    if (!seenSlugs.has(slug)) {
+      seenSlugs.add(slug);
+      chips.push({ label: t.name, value: slug, icon: t.icon || '🔥' });
+    }
+  });
+
+  // Add published categories
+  publishedCats.forEach((c) => {
+    const slug = c.slug || c.name.toLowerCase().replace(/\s+/g, '-');
+    if (!seenSlugs.has(slug)) {
+      seenSlugs.add(slug);
+      chips.push({ label: c.name, value: slug, icon: c.icon || '✨' });
+    }
+  });
 
   // Category filter matching
   const filteredTemplates = selectedCategory === 'all'
@@ -97,13 +116,13 @@ export const HomeDashboard: React.FC = () => {
     .filter((t) => isDevotional(t) && t.type === 'video')
     .slice(0, limit);
 
-  // Category specific sections dynamically populated from live admin trending topics
+  // Category specific sections dynamically populated from live categories & topics
   const categorySections = [
     { title: `${currentRelMeta.title} Devotional`, value: [userReligion, 'devotion', 'bhagwan'], emoji: currentRelMeta.icon },
-    ...publishedTopics.map((top) => ({
-      title: top.name,
-      value: [top.slug || top.name.toLowerCase().replace(/\s+/g, '-'), top.name.toLowerCase(), top.name.toLowerCase().replace(/\s+/g, '')],
-      emoji: top.icon || '🔥',
+    ...publishedCats.map((c) => ({
+      title: c.name,
+      value: [c.slug, c.name.toLowerCase(), c.slug.replace(/-/g, ' '), c.name.toLowerCase().replace(/\s+/g, '')],
+      emoji: c.icon || '✨',
     })),
   ];
 

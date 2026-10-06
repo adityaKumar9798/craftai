@@ -17,4 +17,9 @@ router.post('/admin-media', verifyAuth, upload.any(), UploadController.uploadAdm
 // Signed upload configuration for direct Cloudinary client upload
 router.get('/signature', verifyAuth, UploadController.getSignature);
 
+// CORS-free direct device download and image proxy for Canvas
+router.get('/proxy-download', UploadController.proxyDownload);
+router.get('/proxy-image', UploadController.proxyImage);
+router.post('/composite-video', UploadController.compositeVideo);
+
 export default router;

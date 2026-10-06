@@ -21,7 +21,8 @@ import {
   Image as ImageIcon,
   Crown,
   ArrowRight,
-  Flame
+  Flame,
+  Download
 } from 'lucide-react';
 import { Logo } from '../common/Logo';
 import { useAuth } from '../../contexts/AuthContext';
@@ -55,6 +56,7 @@ export const DesktopLayout: React.FC<DesktopLayoutProps> = ({ children }) => {
         { label: 'Trending Topics', path: '/admin/trending-topics', icon: Flame },
         { label: 'Manage Posts', path: '/admin/posts', icon: ImageIcon },
         { label: 'Templates', path: '/admin/templates', icon: FileText },
+        { label: 'Downloads & Stats', path: '/admin/downloads', icon: Download },
         { label: 'Users', path: '/admin/users', icon: Users },
         { label: 'Categories', path: '/admin/categories', icon: Grid },
       ]

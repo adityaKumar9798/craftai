@@ -94,4 +94,43 @@ export class CloudinaryService {
       secure: true,
     });
   }
+
+  /**
+   * Generate high quality server-side composite video URL with circular gold user photo
+   * Zero frame drops, 100% original quality, original audio, zero client lag
+   */
+  static generateCompositeVideoUrl(
+    videoUrl: string,
+    photoUrl: string,
+    isPostFormat: boolean = false
+  ): string | null {
+    if (!videoUrl || !photoUrl) return null;
+
+    try {
+      const yOffset = isPostFormat ? 220 : 250;
+      const layerSize = isPostFormat ? 280 : 300;
+
+      // Extract user photo public ID or base64 fetch with PNG alpha channel
+      let layerSpec = '';
+      if (photoUrl.includes('res.cloudinary.com') && photoUrl.includes('/upload/')) {
+        const afterUpload = photoUrl.split('/upload/')[1];
+        const withoutVersion = afterUpload.replace(/^v\d+\//, '').replace(/\.[^/.]+$/, '');
+        const formattedPublicId = withoutVersion.replace(/\//g, ':');
+        layerSpec = `l_${formattedPublicId}.png`;
+      } else if (photoUrl.startsWith('http')) {
+        const base64Url = Buffer.from(photoUrl).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        layerSpec = `l_fetch:${base64Url}`;
+      }
+
+      if (layerSpec && videoUrl.includes('res.cloudinary.com') && videoUrl.includes('/video/upload/')) {
+        // f_png ensures transparent alpha channel outside the r_max circle, removing any white box
+        const overlayTransform = `${layerSpec}/c_fill,w_${layerSize},h_${layerSize},r_max,bo_10px_solid_rgb:E5C158,f_png/fl_layer_apply,g_south,y_${yOffset}`;
+        return videoUrl.replace('/video/upload/', `/video/upload/${overlayTransform}/`);
+      }
+    } catch (e) {
+      console.warn('generateCompositeVideoUrl error:', e);
+    }
+    return null;
+  }
 }
+

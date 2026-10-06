@@ -8,6 +8,8 @@ import creativeRoutes from './routes/creative.routes.js';
 import userRoutes from './routes/user.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import trendingRoutes from './routes/trending.routes.js';
+import metricsRoutes from './routes/metrics.routes.js';
+import presenceRoutes from './routes/presence.routes.js';
 
 const app = express();
 
@@ -33,6 +35,8 @@ app.use('/api/creatives', creativeRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/trending', trendingRoutes);
+app.use('/api/metrics', metricsRoutes);
+app.use('/api/presence', presenceRoutes);
 
 // Error handler middleware
 app.use(errorHandler);

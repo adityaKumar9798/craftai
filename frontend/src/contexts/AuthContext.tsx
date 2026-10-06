@@ -14,6 +14,7 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
+  sendEmailVerification,
   signOut,
   onAuthStateChanged,
   updateFirebaseProfile,
@@ -29,7 +30,8 @@ interface AuthContextType {
   isAdmin: boolean;
   loading: boolean;
   login: (email: string, pass: string) => Promise<void>;
-  signup: (name: string, email: string, pass: string) => Promise<void>;
+  signup: (name: string, email: string, pass: string) => Promise<{ email: string; name: string }>;
+  resendVerificationEmail: (email: string, pass?: string) => Promise<boolean>;
   loginWithGoogle: () => Promise<UserProfile | null>;
   quickLogin: (role: 'admin' | 'user') => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
@@ -137,6 +139,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
         if (fbUser) {
+          // If signed in via email/password and NOT verified, do not auto-authenticate
+          const isEmailPassword = fbUser.providerData.some((p) => p.providerId === 'password');
+          if (isEmailPassword && !fbUser.emailVerified) {
+            setUser(null);
+            setUserPhotoUrl('');
+            setToken(null);
+            localStorage.removeItem('craft_ai_user');
+            localStorage.removeItem('craft_ai_photo');
+            localStorage.removeItem('craft_ai_token');
+            setLoading(false);
+            return;
+          }
+
           try {
             const idToken = await fbUser.getIdToken();
             setToken(idToken);
@@ -222,67 +237,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  // Real Email & Password Sign Up in Firebase Auth & Firestore database
-  const signup = async (name: string, emailOrUsername: string, pass: string) => {
+  // Real Email & Password Sign Up with mandatory Email Verification Link
+  const signup = async (name: string, emailOrUsername: string, pass: string): Promise<{ email: string; name: string }> => {
     if (isFirebaseConfigured && auth) {
       const email = emailOrUsername.trim().includes('@')
         ? emailOrUsername.trim()
         : `${emailOrUsername.trim().toLowerCase()}@craftai.com`;
 
+      // 1. Create User in Firebase Auth
       const cred = await createUserWithEmailAndPassword(auth, email, pass);
-      const idToken = await cred.user.getIdToken();
-      setToken(idToken);
-      localStorage.setItem('craft_ai_token', idToken);
 
+      // 2. Set user displayName
       try {
         await updateFirebaseProfile(cred.user, { displayName: name });
       } catch {}
 
-      const isUserAdmin = email.toLowerCase().includes('admin');
-      const newProfile: UserProfile = {
-        uid: cred.user.uid,
-        name,
-        email,
-        photoUrl: '',  // new users start with no photo
-        role: isUserAdmin ? 'admin' : 'user',
-        plan: isUserAdmin ? 'Administrator' : 'Free User',
-        createdAt: new Date().toISOString(),
-        lastLoginAt: new Date().toISOString(),
-      };
-
-      // Save real user record directly to Firestore database (with timeout)
-      if (db) {
-        try {
-          await withTimeout(setDoc(doc(db, 'users', cred.user.uid), newProfile, { merge: true }), 1200);
-          console.log('[Firestore] Real user document created in database:', cred.user.uid);
-        } catch (fsErr) {
-          console.warn('[Firestore Client] Permission notice (handled):', fsErr);
-        }
+      // 3. Send Firebase Email Verification Link
+      try {
+        await sendEmailVerification(cred.user, {
+          url: `${window.location.origin}/login?verified=true&email=${encodeURIComponent(email)}`,
+          handleCodeInApp: false,
+        });
+        console.log('[Auth] Verification email sent to:', email);
+      } catch (evErr) {
+        console.warn('[Auth] Verification send notice:', evErr);
       }
 
-      // Sync with backend asynchronously without blocking navigation
-      fetch('/api/users/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newProfile),
-      }).catch(() => {});
+      // 4. Immediately sign out the unverified session so user cannot log in without verification
+      await signOut(auth);
+      setUser(null);
+      setToken(null);
+      localStorage.removeItem('craft_ai_user');
+      localStorage.removeItem('craft_ai_photo');
+      localStorage.removeItem('craft_ai_token');
 
-      setUser(newProfile);
-      localStorage.setItem('craft_ai_user', JSON.stringify(newProfile));
-      realtimeStore.saveUser(newProfile).catch(() => {});
-
-      realtimeStore.addLiveActivity({
-        id: `signup_${Date.now()}`,
-        type: 'signup',
-        userName: name,
-        timestamp: 'Just now',
-      });
+      return { email, name };
     } else {
       throw new Error('Firebase configuration missing.');
     }
   };
 
-  // Real Email & Password Login with Firebase Auth & Firestore database
+  // Real Email & Password Login (Verifies email verification before allowing access)
   const login = async (emailOrUsername: string, pass: string) => {
     if (isFirebaseConfigured && auth) {
       const email = emailOrUsername.trim().includes('@')
@@ -290,6 +285,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         : `${emailOrUsername.trim().toLowerCase()}@craftai.com`;
 
       const cred = await signInWithEmailAndPassword(auth, email, pass);
+
+      // Strict check: Password accounts MUST be email verified
+      const isEmailPassword = cred.user.providerData.some((p) => p.providerId === 'password');
+      if (isEmailPassword && !cred.user.emailVerified) {
+        // Sign out immediately
+        await signOut(auth);
+        setUser(null);
+        setToken(null);
+        localStorage.removeItem('craft_ai_user');
+        localStorage.removeItem('craft_ai_photo');
+        localStorage.removeItem('craft_ai_token');
+
+        const err: any = new Error('Your email address is not verified yet. Please check your inbox and click the verification link before logging in.');
+        err.code = 'auth/unverified-email';
+        err.email = email;
+        throw err;
+      }
+
       const idToken = await cred.user.getIdToken();
       setToken(idToken);
       localStorage.setItem('craft_ai_token', idToken);
@@ -347,6 +360,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } else {
       throw new Error('Firebase is not configured.');
     }
+  };
+
+  // Resend Verification Email
+  const resendVerificationEmail = async (emailOrUsername: string, pass?: string): Promise<boolean> => {
+    if (isFirebaseConfigured && auth) {
+      const email = emailOrUsername.trim().includes('@')
+        ? emailOrUsername.trim()
+        : `${emailOrUsername.trim().toLowerCase()}@craftai.com`;
+
+      try {
+        if (pass) {
+          const cred = await signInWithEmailAndPassword(auth, email, pass);
+          await sendEmailVerification(cred.user, {
+            url: `${window.location.origin}/login?verified=true&email=${encodeURIComponent(email)}`,
+            handleCodeInApp: false,
+          });
+          await signOut(auth);
+          return true;
+        } else {
+          // If password is not provided, we can send a password reset / account check
+          await sendPasswordResetEmail(auth, email);
+          return true;
+        }
+      } catch (err) {
+        console.warn('[Auth] Resend verification error:', err);
+        return false;
+      }
+    }
+    return false;
   };
 
   // Real Google OAuth Login with Firebase & Firestore database
@@ -532,6 +574,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loading,
         login,
         signup,
+        resendVerificationEmail,
         loginWithGoogle,
         quickLogin,
         resetPassword,

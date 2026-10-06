@@ -29,6 +29,7 @@ export interface Template {
   isPremium: boolean;
   isPublished: boolean;
   tags?: string[];
+  downloadsCount?: number;
   createdAt: string;
 }
 

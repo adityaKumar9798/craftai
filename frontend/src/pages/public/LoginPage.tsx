@@ -1,19 +1,50 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { Eye, EyeOff } from 'lucide-react';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { Eye, EyeOff, CheckCircle2, RefreshCw } from 'lucide-react';
 import { Logo } from '../../components/common/Logo';
 import { useAuth } from '../../contexts/AuthContext';
 import { formatAuthError } from '../../utils/authErrors';
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const { user, login, loginWithGoogle } = useAuth();
+  const location = useLocation();
+  const { user, login, loginWithGoogle, resendVerificationEmail } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Verification handling
+  const [isUnverified, setIsUnverified] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendMessage, setResendMessage] = useState<string | null>(null);
+  const [countdown, setCountdown] = useState(0);
+  const [verifiedSuccess, setVerifiedSuccess] = useState(false);
+
+  // Parse URL query params (e.g. ?verified=true&email=...)
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const isVerifiedParam = params.get('verified') === 'true';
+    const emailParam = params.get('email');
+
+    if (isVerifiedParam) {
+      setVerifiedSuccess(true);
+    }
+    if (emailParam) {
+      setEmail(emailParam);
+    }
+  }, [location.search]);
+
+  // Resend countdown timer
+  useEffect(() => {
+    let timer: any;
+    if (countdown > 0) {
+      timer = setInterval(() => setCountdown((c) => c - 1), 1000);
+    }
+    return () => clearInterval(timer);
+  }, [countdown]);
 
   const handlePostAuthRedirect = () => {
     try {
@@ -46,13 +77,33 @@ export const LoginPage: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
+      setIsUnverified(false);
+      setResendMessage(null);
       await login(email.trim(), password);
       handlePostAuthRedirect();
     } catch (err: any) {
       const msg = formatAuthError(err);
+      if (err?.code === 'auth/unverified-email' || (msg && msg.toLowerCase().includes('not verified'))) {
+        setIsUnverified(true);
+      }
       if (msg) setError(msg);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResend = async () => {
+    if (countdown > 0 || !email.trim()) return;
+    try {
+      setResendLoading(true);
+      setResendMessage(null);
+      await resendVerificationEmail(email.trim(), password);
+      setResendMessage('Verification link sent! Check your inbox & spam folder.');
+      setCountdown(60);
+    } catch (err) {
+      setResendMessage('Failed to resend. Please try again in a moment.');
+    } finally {
+      setResendLoading(false);
     }
   };
 
@@ -60,6 +111,7 @@ export const LoginPage: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
+      setIsUnverified(false);
       console.log('[LoginPage] Initiating Google Sign-In...');
       const profile = await loginWithGoogle();
       if (profile) {
@@ -84,7 +136,7 @@ export const LoginPage: React.FC = () => {
       {/* Centered container */}
       <div className="w-full max-w-md mx-auto min-h-screen bg-white flex flex-col justify-between">
         
-        {/* Top Header with Purple-to-Blue Gradient (Brought lower down) */}
+        {/* Top Header with Purple-to-Blue Gradient */}
         <div className="relative w-full bg-gradient-to-r from-[#9B26B6] via-[#6339C9] to-[#2188FF] pt-16 pb-28 sm:pb-32 px-6 text-white text-center">
           
           {/* Centered Large "Login" Title */}
@@ -104,53 +156,78 @@ export const LoginPage: React.FC = () => {
           </div>
         </div>
 
-        {/* White Body Form Section (Shifted higher up & Increased Font Sizes) */}
+        {/* White Body Form Section */}
         <div className="px-6 sm:px-8 pt-0 pb-8 flex-1 flex flex-col justify-start items-center w-full -mt-2">
           
-          <div className="w-full max-w-sm space-y-5">
+          <div className="w-full max-w-sm space-y-4">
             
             {/* Official Craft AI Brand Logo & Name */}
             <div className="flex items-center justify-center pt-1">
               <Logo size="md" />
             </div>
 
-            {/* "Welcome" Title in Purple-to-Blue Gradient (Bigger text) */}
+            {/* "Welcome" Title in Purple-to-Blue Gradient */}
             <div className="text-center flex items-center justify-center -mt-1">
               <h2 className="text-4xl sm:text-5xl font-black bg-gradient-to-r from-[#9B26B6] via-[#7B2CBF] to-[#2188FF] bg-clip-text text-transparent tracking-tight text-center">
                 Welcome
               </h2>
             </div>
 
+            {/* Email Verified Success Banner */}
+            {verifiedSuccess && !error && (
+              <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-2.5 animate-in fade-in">
+                <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                <span>Email verified successfully! Please enter your password to log in.</span>
+              </div>
+            )}
+
+            {/* Error Message & Verification Resend Action */}
             {error && (
-              <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 text-xs font-semibold text-center">
-                {error}
+              <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold space-y-2">
+                <div className="text-center">{error}</div>
+                {isUnverified && (
+                  <div className="pt-1 flex flex-col items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={handleResend}
+                      disabled={countdown > 0 || resendLoading}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-purple-600 text-white hover:bg-purple-700 font-bold transition text-[11px] shadow-xs disabled:opacity-50"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${resendLoading ? 'animate-spin' : ''}`} />
+                      <span>{countdown > 0 ? `Resend link (${countdown}s)` : 'Resend Verification Email'}</span>
+                    </button>
+                    {resendMessage && (
+                      <span className="text-[11px] text-purple-700 font-medium">{resendMessage}</span>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
             {/* Form */}
-            <form onSubmit={handleSubmit} autoComplete="off" className="space-y-4 pt-1">
+            <form onSubmit={handleSubmit} autoComplete="off" className="space-y-3.5 pt-1">
               
-              {/* Enter Username Input (Increased font size & padding) */}
+              {/* Enter Username Input */}
               <div className="space-y-1">
                 <input
                   type="text"
                   placeholder="Enter Username or Email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  autoComplete="off"
+                  autoComplete="username"
                   className="w-full px-5 py-4 rounded-2xl border border-gray-300 bg-white text-base sm:text-lg text-gray-900 placeholder-gray-400 placeholder:text-base focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent transition shadow-2xs font-medium"
                   required
                 />
               </div>
 
-              {/* Enter Password Input (Increased font size & padding) */}
+              {/* Enter Password Input */}
               <div className="space-y-1 relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
                   placeholder="Enter Password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  autoComplete="new-password"
+                  autoComplete="current-password"
                   className="w-full pl-5 pr-14 py-4 rounded-2xl border border-gray-300 bg-white text-base sm:text-lg text-gray-900 placeholder-gray-400 placeholder:text-base focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent transition shadow-2xs font-medium"
                   required
                 />
@@ -163,17 +240,17 @@ export const LoginPage: React.FC = () => {
                 </button>
               </div>
 
-              {/* Gradient Login Button (Bigger font size) */}
+              {/* Gradient Login Button */}
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-4 rounded-2xl bg-gradient-to-r from-[#9B26B6] via-[#6339C9] to-[#2188FF] text-white text-lg font-black tracking-wide shadow-md shadow-purple-500/25 hover:opacity-95 active:scale-[0.99] transition disabled:opacity-50 mt-2"
+                className="w-full py-4 rounded-2xl bg-gradient-to-r from-[#9B26B6] via-[#6339C9] to-[#2188FF] text-white text-lg font-black tracking-wide shadow-md shadow-purple-500/25 hover:opacity-95 active:scale-[0.99] transition disabled:opacity-50 mt-1"
               >
                 {loading ? 'Logging in...' : 'Login'}
               </button>
             </form>
 
-            {/* Forget Password ? Centered Bold Link (Increased font size) */}
+            {/* Forget Password ? Centered Bold Link */}
             <div className="text-center pt-1">
               <Link
                 to="/forgot-password"
@@ -184,7 +261,7 @@ export const LoginPage: React.FC = () => {
             </div>
 
             {/* Social Login Options */}
-            <div className="pt-2 flex items-center justify-center gap-4">
+            <div className="pt-1 flex items-center justify-center gap-4">
               <button
                 type="button"
                 onClick={handleGoogleLogin}
@@ -211,7 +288,7 @@ export const LoginPage: React.FC = () => {
           </div>
 
           {/* Bottom Sign Up Link */}
-          <p className="text-center text-sm text-gray-500 pt-6">
+          <p className="text-center text-sm text-gray-500 pt-4">
             Don't have an account?{' '}
             <Link to="/signup" className="text-[#8338EC] font-black hover:underline">
               Sign Up

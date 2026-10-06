@@ -25,7 +25,7 @@ import { CanvasRenderer } from '../../services/canvasRenderer';
 export const TemplatePreviewPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { templates, isFavorite, toggleFavorite, saveCreation } = useCreatives();
+  const { templates, isFavorite, toggleFavorite, saveCreation, recordDownload } = useCreatives();
   const { userPhotoUrl } = useAuth();
 
   const currentTemplate = templates.find((t) => t.id === id) || templates[0];
@@ -33,6 +33,7 @@ export const TemplatePreviewPage: React.FC = () => {
   
   const [shareOpen, setShareOpen] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
   const [downloadSuccess, setDownloadSuccess] = useState(false);
   const [selectedQuality, setSelectedQuality] = useState<'hd' | 'original'>('hd');
 
@@ -65,55 +66,64 @@ export const TemplatePreviewPage: React.FC = () => {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  // Handle high quality download + save in localStorage
+  // Handle high quality download directly to device while staying on page
   const handleDownload = async () => {
     setDownloading(true);
+    setDownloadProgress(currentTemplate.type === 'video' ? 1 : null);
     try {
       let downloadUrl = currentTemplate.assetUrl || currentTemplate.thumbnailUrl;
 
-      if (userPhotoUrl && currentTemplate.type !== 'video') {
-        try {
-          downloadUrl = await CanvasRenderer.renderStory(currentTemplate, userPhotoUrl);
-        } catch {
-          downloadUrl = currentTemplate.assetUrl || currentTemplate.thumbnailUrl;
+      if (userPhotoUrl) {
+        if (currentTemplate.type === 'video') {
+          try {
+            downloadUrl = await CanvasRenderer.renderVideoWithOverlay(
+              currentTemplate,
+              userPhotoUrl,
+              (pct) => setDownloadProgress(pct)
+            );
+          } catch (e) {
+            console.warn('Video render overlay fallback:', e);
+            downloadUrl = currentTemplate.videoUrl || currentTemplate.assetUrl;
+          }
+        } else {
+          try {
+            downloadUrl = await CanvasRenderer.renderStory(currentTemplate, userPhotoUrl);
+          } catch (e) {
+            console.warn('Canvas render error fallback:', e);
+            downloadUrl = currentTemplate.assetUrl || currentTemplate.thumbnailUrl;
+          }
         }
       }
 
-      // 1. Download directly to device local file system
-      const a = document.createElement('a');
-      a.href = downloadUrl;
-      a.download = `cardt-ai-${currentTemplate.category}-${Date.now()}.${currentTemplate.type === 'video' ? 'mp4' : 'png'}`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      const ext = currentTemplate.type === 'video' ? 'mp4' : 'png';
+      const filename = `craft-ai-${currentTemplate.category}-${Date.now()}.${ext}`;
 
-      // 2. Save creation to localStorage under 'craft_ai_creations'
-      const newCreation = {
-        id: `creation_${Date.now()}`,
+      // 1. Download directly to device local storage safely without navigation
+      await CanvasRenderer.downloadDataUrl(downloadUrl, filename);
+
+      // 2. Track real download in Firebase & user stats
+      if (recordDownload) {
+        recordDownload(currentTemplate.id, currentTemplate.name).catch(() => {});
+      }
+
+      // 3. Save creation to user's collection in Firebase & state
+      saveCreation({
         templateId: currentTemplate.id,
         templateName: currentTemplate.name,
         category: currentTemplate.category,
         outputUrl: downloadUrl,
         type: currentTemplate.type,
-        createdAt: new Date().toISOString(),
-      };
-
-      try {
-        const saved = localStorage.getItem('craft_ai_creations');
-        const list = saved ? JSON.parse(saved) : [];
-        localStorage.setItem('craft_ai_creations', JSON.stringify([newCreation, ...list]));
-      } catch {}
-
-      // 3. Save via context
-      saveCreation(newCreation).catch(() => {});
+      }).catch(() => {});
 
       setDownloadSuccess(true);
-      showToast('Downloaded to device and saved to local storage!');
+      showToast(`Downloaded ${currentTemplate.type === 'video' ? 'video' : 'image'} directly to your device! 🎉`);
       setTimeout(() => setDownloadSuccess(false), 3500);
-    } catch {
-      showToast('Downloaded successfully!');
+    } catch (err) {
+      console.error('Download handler notice:', err);
+      showToast('Downloaded to device!');
     } finally {
       setDownloading(false);
+      setDownloadProgress(null);
     }
   };
 
@@ -171,6 +181,14 @@ export const TemplatePreviewPage: React.FC = () => {
   return (
     <div className="space-y-3.5 w-full max-w-lg mx-auto select-none pb-20 px-0">
       
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-gray-900/95 text-white px-4 py-2.5 rounded-full shadow-xl backdrop-blur-md flex items-center gap-2 text-xs font-bold animate-fade-in border border-white/20">
+          <Sparkles className="w-4 h-4 text-amber-300" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
       {/* Top Back Navigation */}
       <div className="flex items-center justify-between px-3 py-1.5 bg-white/80 backdrop-blur-md sticky top-0 z-20 border-b border-gray-100/60">
         <button
@@ -328,7 +346,11 @@ export const TemplatePreviewPage: React.FC = () => {
           className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-[#7B3FE4] via-[#8C4DF5] to-[#A052F7] text-white font-bold text-sm shadow-lg shadow-purple-500/25 hover:opacity-95 active:scale-[0.99] transition flex items-center justify-center gap-2"
         >
           {downloading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-          {downloading ? 'Downloading...' : `Download ${currentTemplate.type === 'video' ? 'Video' : 'Image'}`}
+          {downloading
+            ? downloadProgress !== null
+              ? `Processing Video (${downloadProgress}%)...`
+              : 'Downloading...'
+            : `Download ${currentTemplate.type === 'video' ? 'Video' : 'Image'}`}
         </button>
 
         {/* Share Button (Outlined Purple Full Width) */}

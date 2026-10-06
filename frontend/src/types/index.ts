@@ -38,6 +38,7 @@ export interface Template {
   isPremium: boolean;
   isPublished: boolean;
   tags?: string[];
+  downloadsCount?: number;
   createdAt: string;
 }
 
@@ -78,6 +79,10 @@ export interface UserProfile {
   processedPhotoUrl?: string;
   role: 'user' | 'admin';
   plan?: string;
+  downloadsCount?: number;
+  creationsCount?: number;
+  favoritesCount?: number;
+  favorites?: string[];
   createdAt: string;
   lastLoginAt?: string;
   updatedAt?: string;

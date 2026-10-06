@@ -8,7 +8,7 @@ import { StoryCard } from '../../components/common/StoryCard';
 
 export const MyCreationsPage: React.FC = () => {
   const navigate = useNavigate();
-  const { creations, deleteCreation, favorites, templates } = useCreatives();
+  const { creations, deleteCreation, favorites, templates, recordDownload } = useCreatives();
   const [activeTab, setActiveTab] = useState<'images' | 'videos' | 'favorites'>('images');
   const [shareItem, setShareItem] = useState<{ title: string; url: string } | null>(null);
 
@@ -84,8 +84,11 @@ export const MyCreationsPage: React.FC = () => {
                   {/* Actions overlay */}
                   <div className="absolute bottom-3 inset-x-3 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                     <button
-                      onClick={() => CanvasRenderer.downloadDataUrl(item.outputUrl, `story-${item.id}.png`)}
-                      className="p-2.5 rounded-full bg-white text-gray-800 hover:scale-110 transition shadow-md"
+                      onClick={() => {
+                        CanvasRenderer.downloadDataUrl(item.outputUrl, `story-${item.id}.png`);
+                        recordDownload(item.id, item.templateName);
+                      }}
+                      className="p-2.5 rounded-full bg-white text-gray-800 hover:scale-110 transition shadow-md cursor-pointer"
                       title="Download"
                     >
                       <Download className="w-4 h-4" />

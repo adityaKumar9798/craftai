@@ -10,18 +10,31 @@ export const TemplateGridPage: React.FC = () => {
   const { templates, categories } = useCreatives();
 
   const currentCategory = categories.find(
-    (c) => c.slug.toLowerCase() === (slug || 'morning').toLowerCase()
-  ) || categories[0];
+    (c) => c.slug.toLowerCase() === (slug || '').toLowerCase() || c.name.toLowerCase() === (slug || '').toLowerCase()
+  ) || categories[0] || {
+    id: `cat-${slug}`,
+    name: (slug || 'Templates').replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+    slug: slug || 'all',
+    icon: '✨',
+    backgroundColor: '#F3F4F6',
+    accentColor: '#6B7280',
+    templateCount: 0,
+    order: 1,
+    isPublished: true,
+  };
 
   const [activeTag, setActiveTag] = useState<string>('All');
   const [search, setSearch] = useState('');
 
-  const filterChips = ['All', 'Nature', 'Positive', 'Quotes', 'Coffee', 'Trending'];
+  const filterChips = ['All', 'Trending', 'Popular', 'Quotes', 'Creative', 'Devotional'];
 
   // Filter templates belonging to this category
-  let categoryTemplates = templates.filter(
-    (t) => t.category.toLowerCase() === currentCategory.slug.toLowerCase()
-  );
+  let categoryTemplates = templates.filter((t) => {
+    const cat = (t.category || '').toLowerCase();
+    const s = (currentCategory.slug || '').toLowerCase();
+    const name = (currentCategory.name || '').toLowerCase();
+    return cat === s || cat === name || cat.replace(/-/g, ' ') === s.replace(/-/g, ' ');
+  });
 
   // Filter by tag
   if (activeTag !== 'All') {

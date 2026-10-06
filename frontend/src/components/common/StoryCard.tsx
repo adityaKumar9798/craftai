@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Heart, Crown, Play, Camera, User, Copy, Download, Share2 } from 'lucide-react';
 import { Template } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCreatives } from '../../contexts/CreativesContext';
+import { CanvasRenderer } from '../../services/canvasRenderer';
 
 interface StoryCardProps {
   template: Template;
@@ -16,17 +17,31 @@ export const StoryCard: React.FC<StoryCardProps> = ({
   showDetails = false,
 }) => {
   const { userPhotoUrl } = useAuth();
-  const { isFavorite, toggleFavorite } = useCreatives();
+  const { isFavorite, toggleFavorite, saveCreation, recordDownload } = useCreatives();
   const favorite = isFavorite(template.id);
   const [imgFailed, setImgFailed] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   const isPostFormat = template.format === 'post';
+  const isVideo = template.type === 'video' || (template.assetUrl && /\.(mp4|webm|mov|mkv)$/i.test(template.assetUrl));
   const hasValidPhoto = Boolean(userPhotoUrl && userPhotoUrl.trim() && !imgFailed);
 
   // Strictly enforce exact same clean size & lower position for both posts and 9:16 stories
   const slotLeft = isPostFormat ? '36%' : '36%';
   const slotTop = isPostFormat ? '64%' : '67%';
   const slotWidth = isPostFormat ? '28%' : '28%';
+
+  const handleMouseEnter = () => {
+    setIsHovered(true);
+    if (videoRef.current) {
+      videoRef.current.play().catch(() => {});
+    }
+  };
+
+  const handleMouseLeave = () => {
+    setIsHovered(false);
+  };
 
   const commonPhotoSlot = (
     <div
@@ -54,31 +69,44 @@ export const StoryCard: React.FC<StoryCardProps> = ({
     </div>
   );
 
-  const handleDownload = (e: React.MouseEvent) => {
+  const handleDownload = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    const downloadUrl = template.assetUrl || template.thumbnailUrl;
-    const a = document.createElement('a');
-    a.href = downloadUrl;
-    a.download = `${template.name || 'cardt-ai-creative'}.${template.type === 'video' ? 'mp4' : 'png'}`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-
-    // Save to localStorage
     try {
-      const saved = localStorage.getItem('craft_ai_creations');
-      const list = saved ? JSON.parse(saved) : [];
-      const newCreation = {
-        id: `creation_${Date.now()}`,
+      let downloadUrl = template.assetUrl || template.thumbnailUrl;
+      if (userPhotoUrl) {
+        if (isVideo) {
+          try {
+            downloadUrl = await CanvasRenderer.renderVideoWithOverlay(template, userPhotoUrl);
+          } catch {
+            downloadUrl = template.videoUrl || template.assetUrl;
+          }
+        } else {
+          try {
+            downloadUrl = await CanvasRenderer.renderStory(template, userPhotoUrl);
+          } catch {
+            downloadUrl = template.assetUrl || template.thumbnailUrl;
+          }
+        }
+      }
+
+      const ext = isVideo ? 'mp4' : 'png';
+      const filename = `craft-ai-${template.category}-${Date.now()}.${ext}`;
+
+      await CanvasRenderer.downloadDataUrl(downloadUrl, filename);
+      if (recordDownload) {
+        recordDownload(template.id, template.name).catch(() => {});
+      }
+
+      saveCreation({
         templateId: template.id,
         templateName: template.name,
         category: template.category,
         outputUrl: downloadUrl,
         type: template.type,
-        createdAt: new Date().toISOString(),
-      };
-      localStorage.setItem('craft_ai_creations', JSON.stringify([newCreation, ...list]));
-    } catch {}
+      }).catch(() => {});
+    } catch (err) {
+      console.warn('StoryCard download notice:', err);
+    }
   };
 
   const handleShare = (e: React.MouseEvent) => {
@@ -120,19 +148,35 @@ export const StoryCard: React.FC<StoryCardProps> = ({
     const style = catColors[template.category.toLowerCase()] || { bg: 'bg-purple-500', icon: '✨' };
 
     return (
-      <div className="w-full overflow-hidden rounded-[13px] bg-white border border-[#e9e9ef] shadow-[0_2px_7px_rgba(0,0,0,0.10)] select-none">
-        
-        {/* Image Section */}
+      <div 
+        className="w-full overflow-hidden rounded-[13px] bg-white border border-[#e9e9ef] shadow-[0_2px_7px_rgba(0,0,0,0.10)] select-none"
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+      >
+        {/* Image / Video Section */}
         <div 
-          className="relative w-full aspect-[3/4] overflow-hidden cursor-pointer group"
+          className="relative w-full aspect-[3/4] overflow-hidden cursor-pointer group bg-gray-900"
           onClick={onClick}
         >
-          <img
-            src={template.assetUrl || template.thumbnailUrl}
-            alt={template.name}
-            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-            loading="lazy"
-          />
+          {isVideo ? (
+            <video
+              ref={videoRef}
+              src={template.videoUrl || template.assetUrl}
+              poster={template.thumbnailUrl}
+              autoPlay
+              loop
+              muted
+              playsInline
+              className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+            />
+          ) : (
+            <img
+              src={template.assetUrl || template.thumbnailUrl}
+              alt={template.name}
+              className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+              loading="lazy"
+            />
+          )}
 
           {commonPhotoSlot}
 
@@ -141,7 +185,7 @@ export const StoryCard: React.FC<StoryCardProps> = ({
             className={`absolute top-[8px] left-[8px] px-[9px] py-[4px]
             rounded-full flex items-center gap-[4px]
             text-white text-[9px] font-semibold leading-none
-            ${style.bg}`}
+            ${style.bg} z-10`}
           >
             {template.isPremium ? <Crown className="w-2.5 h-2.5 text-amber-200 fill-amber-200" /> : <span>{style.icon}</span>}
             {template.category.toUpperCase()}
@@ -152,7 +196,7 @@ export const StoryCard: React.FC<StoryCardProps> = ({
             onClick={(e) => { e.stopPropagation(); toggleFavorite(template.id); }}
             className="absolute top-[7px] right-[7px] w-[29px] h-[29px]
             rounded-full bg-white/95 flex items-center justify-center
-            shadow-sm transition hover:scale-110"
+            shadow-sm transition hover:scale-110 z-10 cursor-pointer"
           >
             <Heart
               size={16}
@@ -163,14 +207,12 @@ export const StoryCard: React.FC<StoryCardProps> = ({
             />
           </button>
 
-          {/* Video Play Button */}
-          {template.type === 'video' && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="w-[43px] h-[43px] rounded-full
-              bg-black/55 border border-white/40
-              flex items-center justify-center">
-                <Play size={21} fill="white" color="white" className="ml-1" />
-              </div>
+          {/* Video Play Badge if video */}
+          {isVideo && (
+            <div className="absolute top-2 right-12 z-10 pointer-events-none">
+              <span className="px-2 py-0.5 rounded-full bg-black/60 backdrop-blur-sm text-[9px] text-white font-bold flex items-center gap-1">
+                <Play className="w-2.5 h-2.5 fill-white" /> Video
+              </span>
             </div>
           )}
         </div>
@@ -231,15 +273,30 @@ export const StoryCard: React.FC<StoryCardProps> = ({
   return (
     <div
       onClick={onClick}
-      className={`group relative cursor-pointer overflow-hidden rounded-2xl bg-gray-100 shadow-sm transition-all duration-300 hover:shadow-xl hover:-translate-y-1 aspect-[9/16] select-none border border-gray-100`}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      className={`group relative cursor-pointer overflow-hidden rounded-2xl bg-gray-900 shadow-sm transition-all duration-300 hover:shadow-xl hover:-translate-y-1 aspect-[9/16] select-none border border-gray-100`}
     >
-      {/* Background Template Asset */}
-      <img
-        src={template.assetUrl || template.thumbnailUrl}
-        alt={template.name}
-        className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
-        loading="lazy"
-      />
+      {/* Background Template Asset (Video or Image) */}
+      {isVideo ? (
+        <video
+          ref={videoRef}
+          src={template.videoUrl || template.assetUrl}
+          poster={template.thumbnailUrl}
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+        />
+      ) : (
+        <img
+          src={template.assetUrl || template.thumbnailUrl}
+          alt={template.name}
+          className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+          loading="lazy"
+        />
+      )}
 
       {/* Dark & Soft Glow Overlays for Contrast */}
       <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/60 pointer-events-none" />
@@ -265,7 +322,7 @@ export const StoryCard: React.FC<StoryCardProps> = ({
             e.stopPropagation();
             toggleFavorite(template.id);
           }}
-          className="flex h-8 w-8 items-center justify-center rounded-full bg-white/80 backdrop-blur-md text-gray-700 transition hover:bg-white hover:scale-110 shadow-sm"
+          className="flex h-8 w-8 items-center justify-center rounded-full bg-white/80 backdrop-blur-md text-gray-700 transition hover:bg-white hover:scale-110 shadow-sm cursor-pointer"
           title="Favorite"
         >
           <Heart
@@ -277,11 +334,11 @@ export const StoryCard: React.FC<StoryCardProps> = ({
       </div>
 
       {/* Video Indicator if video story */}
-      {template.type === 'video' && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/90 shadow-lg text-purple-600 backdrop-blur-sm group-hover:scale-110 transition-transform">
-            <Play className="w-5 h-5 ml-0.5 fill-current" />
-          </div>
+      {isVideo && (
+        <div className="absolute top-3 left-16 z-10 pointer-events-none">
+          <span className="px-2 py-0.5 rounded-full bg-black/50 backdrop-blur-sm text-[9px] text-white font-bold flex items-center gap-1">
+            <Play className="w-2.5 h-2.5 fill-white" /> Video
+          </span>
         </div>
       )}
 

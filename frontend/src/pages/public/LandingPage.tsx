@@ -1,18 +1,83 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, Sparkles } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Logo } from '../../components/common/Logo';
-const DEFAULT_USER_PHOTO = 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=800&q=85';
+
+interface DeityCard {
+  id: string;
+  name: string;
+  title: string;
+  subtitle: string;
+  mantra: string;
+  badge: string;
+  image: string;
+  accentColor: string;
+  glowColor: string;
+  borderColor: string;
+  gradient: string;
+}
+
+const DEITY_CARDS: DeityCard[] = [
+  {
+    id: 'shiva',
+    name: 'Lord Shiva',
+    title: 'Har Har Mahadev',
+    subtitle: 'Mount Kailash • Cosmic Meditation',
+    mantra: 'ॐ नमः शिवाय',
+    badge: '🕉️ Mahadev',
+    image: '/assets/deities/shiva.jpg',
+    accentColor: 'text-cyan-400',
+    glowColor: 'shadow-cyan-500/40',
+    borderColor: 'border-cyan-300',
+    gradient: 'from-blue-900/80 via-slate-900/60 to-black/80',
+  },
+  {
+    id: 'krishna',
+    name: 'Lord Krishna',
+    title: 'Jai Shree Krishna',
+    subtitle: 'Vrindavan Dham • Divine Bliss & Love',
+    mantra: 'राधे राधे • हरे कृष्णा',
+    badge: '🦚 Shri Krishna',
+    image: '/assets/deities/krishna.jpg',
+    accentColor: 'text-amber-300',
+    glowColor: 'shadow-amber-500/40',
+    borderColor: 'border-amber-300',
+    gradient: 'from-amber-950/80 via-yellow-950/60 to-black/80',
+  },
+  {
+    id: 'durga',
+    name: 'Maa Durga',
+    title: 'Jai Mata Di',
+    subtitle: 'Navratri Mahotsav • Supreme Shakti',
+    mantra: 'सर्वमंगल मांगल्ये शिवे सर्वार्थ साधिके',
+    badge: '🔱 Maa Durga',
+    image: '/assets/deities/durga.jpg',
+    accentColor: 'text-rose-300',
+    glowColor: 'shadow-rose-500/40',
+    borderColor: 'border-rose-300',
+    gradient: 'from-rose-950/80 via-red-950/60 to-black/80',
+  },
+];
 
 export const LandingPage: React.FC = () => {
   const navigate = useNavigate();
-  const [activeSlide, setActiveSlide] = useState(0);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
-  const previewTemplates = [
-    { id: '1', assetUrl: 'https://images.unsplash.com/photo-1542204165-65bf26472b9b?auto=format&fit=crop&w=800&q=80', name: 'Good Morning', headline: 'Start your day right' },
-    { id: '2', assetUrl: 'https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?auto=format&fit=crop&w=800&q=80', name: 'Bee Yourself', headline: 'Always bee yourself' },
-    { id: '3', assetUrl: 'https://images.unsplash.com/photo-1490730141103-6cac27aaab94?auto=format&fit=crop&w=800&q=80', name: 'Life is Beautiful', headline: 'Embrace every moment' },
-  ];
+  // Auto-cycle through the 3 deities every 3 seconds
+  React.useEffect(() => {
+    if (hoveredIndex !== null) return; // Pause auto-rotation when user is hovering
+
+    const interval = setInterval(() => {
+      setActiveIndex((prev) => (prev + 1) % DEITY_CARDS.length);
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [hoveredIndex]);
+
+  // The active display deity index (hover takes precedence over active index)
+  const currentIdx = hoveredIndex !== null ? hoveredIndex : activeIndex;
 
   return (
     <div className="min-h-screen bg-white text-gray-900 flex flex-col relative overflow-hidden select-none">
@@ -36,13 +101,13 @@ export const LandingPage: React.FC = () => {
         <div className="flex items-center gap-3">
           <button
             onClick={() => navigate('/login')}
-            className="text-sm font-semibold text-gray-700 hover:text-gray-900 px-3 py-2 transition"
+            className="text-sm font-semibold text-gray-700 hover:text-gray-900 px-3 py-2 transition cursor-pointer"
           >
             Login
           </button>
           <button
             onClick={() => navigate('/signup')}
-            className="px-5 py-2.5 rounded-full brand-gradient text-white text-sm font-bold shadow-md shadow-purple-500/20 hover:opacity-95 transition"
+            className="px-5 py-2.5 rounded-full brand-gradient text-white text-sm font-bold shadow-md shadow-purple-500/20 hover:opacity-95 transition cursor-pointer"
           >
             Get Started
           </button>
@@ -64,104 +129,129 @@ export const LandingPage: React.FC = () => {
           </h1>
 
           <p className="mt-5 text-base sm:text-lg text-gray-600 leading-relaxed max-w-md mx-auto md:mx-0">
-            Add your photo and make every story yours. Over 45+ stylized templates ready to personalize in seconds.
+            Create divine devotional stories, status updates, and custom greeting cards. Add your photo or share with loved ones in seconds.
           </p>
 
           {/* Action Buttons */}
           <div className="mt-8 flex flex-col sm:flex-row items-center gap-4 justify-center md:justify-start">
             <button
               onClick={() => navigate('/signup')}
-              className="w-full sm:w-auto px-8 py-4 rounded-full brand-gradient text-white text-base font-bold shadow-xl shadow-purple-500/25 hover:scale-[1.02] active:scale-[0.98] transition flex items-center justify-center gap-2"
+              className="w-full sm:w-auto px-8 py-4 rounded-full brand-gradient text-white text-base font-bold shadow-xl shadow-purple-500/25 hover:scale-[1.02] active:scale-[0.98] transition flex items-center justify-center gap-2 cursor-pointer"
             >
               Get Started
               <ArrowRight className="w-5 h-5" />
             </button>
-
-            <button
-              onClick={() => navigate('/home')}
-              className="text-sm font-semibold text-gray-500 hover:text-gray-800 px-4 py-2 transition"
-            >
-              Skip
-            </button>
-          </div>
-
-          {/* Carousel Onboarding Dots */}
-          <div className="mt-10 flex items-center justify-center md:justify-start gap-2">
-            {[0, 1, 2].map((idx) => (
-              <button
-                key={idx}
-                onClick={() => setActiveSlide(idx)}
-                className={`h-2.5 rounded-full transition-all duration-300 ${
-                  activeSlide === idx ? 'w-8 brand-gradient' : 'w-2.5 bg-gray-200'
-                }`}
-              />
-            ))}
           </div>
         </div>
 
-        {/* Right Column: Overlapping Story Cards Fan (Desktop & Mobile Match) */}
-        <div className="flex-1 flex justify-center items-center relative w-full max-w-md lg:max-w-lg">
-          <div className="relative w-72 sm:w-80 h-[460px] sm:h-[500px]">
-            {/* Card 1 - Left Angle */}
-            <div className="absolute top-6 -left-6 sm:-left-10 w-52 sm:w-56 aspect-[9/16] rounded-2xl overflow-hidden shadow-xl border-2 border-white transform -rotate-12 hover:rotate-0 hover:z-30 transition-all duration-500">
-              <img
-                src={previewTemplates[1].assetUrl}
-                alt="Story preview"
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-              <div className="absolute top-3 inset-x-2 text-center text-white text-xs font-bold">
-                {previewTemplates[1].headline}
-              </div>
-              <div className="absolute inset-x-6 top-24 bottom-20 rounded-xl overflow-hidden border border-white/60">
-                <img src={DEFAULT_USER_PHOTO} alt="Subject" className="w-full h-full object-cover" />
-              </div>
-            </div>
+        {/* Right Column: Dynamic Interactive Devotional Story Cards Fan */}
+        <div className="flex-1 flex justify-center items-center relative w-full max-w-md lg:max-w-lg select-none">
+          <div className="relative w-72 sm:w-80 h-[490px] sm:h-[530px] flex items-center justify-center">
+            {DEITY_CARDS.map((deity, idx) => {
+              // Calculate relative position based on currentIdx
+              const offset = (idx - currentIdx + DEITY_CARDS.length) % DEITY_CARDS.length;
+              const isCenter = offset === 0;
+              const isLeft = offset === 1 || (DEITY_CARDS.length === 3 && offset === 2 && currentIdx === (idx + 1) % 3);
+              const isRight = offset === 2;
 
-            {/* Card 2 - Right Angle */}
-            <div className="absolute top-6 -right-6 sm:-right-10 w-52 sm:w-56 aspect-[9/16] rounded-2xl overflow-hidden shadow-xl border-2 border-white transform rotate-12 hover:rotate-0 hover:z-30 transition-all duration-500">
-              <img
-                src={previewTemplates[2].assetUrl}
-                alt="Story preview"
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-              <div className="absolute top-3 inset-x-2 text-center text-white text-xs font-bold">
-                {previewTemplates[2].headline}
-              </div>
-              <div className="absolute inset-x-6 top-24 bottom-20 rounded-xl overflow-hidden border border-white/60">
-                <img src={DEFAULT_USER_PHOTO} alt="Subject" className="w-full h-full object-cover" />
-              </div>
-            </div>
+              let zIndex = 10;
+              let rotate = 0;
+              let translateX = 0;
+              let scale = 0.88;
+              let opacity = 0.85;
 
-            {/* Card 3 - Main Center Front */}
-            <div className="absolute top-0 inset-x-0 mx-auto w-56 sm:w-64 aspect-[9/16] rounded-2xl overflow-hidden shadow-2xl border-4 border-white z-20 transform hover:scale-105 transition-transform duration-300">
-              <img
-                src={previewTemplates[0].assetUrl}
-                alt="Main story preview"
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30" />
-              <div className="absolute top-4 inset-x-2 text-center">
-                <p className="text-white text-base sm:text-lg font-black drop-shadow">
-                  Good Morning
-                </p>
-                <p className="text-amber-200 text-xs italic">
-                  Have a Beautiful Day
-                </p>
-              </div>
-              <div className="absolute inset-x-8 top-28 bottom-24 rounded-2xl overflow-hidden border-2 border-white/80 shadow-lg">
-                <img src={DEFAULT_USER_PHOTO} alt="Subject" className="w-full h-full object-cover" />
-              </div>
-              <div className="absolute bottom-4 inset-x-3 text-center">
-                <span className="text-[11px] font-semibold text-white/90 drop-shadow">
-                  Stay Positive • Stay Happy
-                </span>
-              </div>
-            </div>
+              if (isCenter) {
+                zIndex = 30;
+                rotate = 0;
+                translateX = 0;
+                scale = 1.04;
+                opacity = 1;
+              } else if (offset === 1) {
+                zIndex = 20;
+                rotate = 12;
+                translateX = 70;
+                scale = 0.9;
+                opacity = 0.85;
+              } else {
+                zIndex = 15;
+                rotate = -12;
+                translateX = -70;
+                scale = 0.9;
+                opacity = 0.85;
+              }
+
+              return (
+                <motion.div
+                  key={deity.id}
+                  layout
+                  initial={false}
+                  animate={{
+                    rotate: rotate,
+                    x: translateX,
+                    scale: scale,
+                    zIndex: zIndex,
+                    opacity: opacity,
+                  }}
+                  transition={{
+                    type: 'spring',
+                    stiffness: 300,
+                    damping: 25,
+                  }}
+                  onMouseEnter={() => setHoveredIndex(idx)}
+                  onMouseLeave={() => setHoveredIndex(null)}
+                  onClick={() => setActiveIndex(idx)}
+                  className={`absolute top-0 w-60 sm:w-64 aspect-[9/16] rounded-3xl overflow-hidden shadow-2xl border-4 transition-all duration-300 cursor-pointer group ${
+                    isCenter ? `${deity.borderColor} ${deity.glowColor}` : 'border-white/80 shadow-lg'
+                  }`}
+                  style={{
+                    transformOrigin: 'bottom center',
+                  }}
+                >
+                  {/* Deity Background Image with Zoom on Hover */}
+                  <img
+                    src={deity.image}
+                    alt={deity.name}
+                    className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700 ease-out"
+                  />
+
+                  {/* Gradient Overlay */}
+                  <div className={`absolute inset-0 bg-gradient-to-t ${deity.gradient} transition-opacity duration-300`} />
+
+                  {/* Top Header & Deity Badge */}
+                  <div className="absolute top-4 inset-x-3 flex flex-col items-center text-center">
+                    <span className="px-2.5 py-0.5 rounded-full bg-white/20 backdrop-blur-md text-white text-[10px] font-bold border border-white/30 tracking-wide mb-1.5 shadow-sm">
+                      {deity.badge}
+                    </span>
+                    <h3 className="text-white text-base sm:text-lg font-black tracking-wide drop-shadow-md">
+                      {deity.title}
+                    </h3>
+                    <p className={`text-xs font-semibold ${deity.accentColor} drop-shadow italic`}>
+                      {deity.subtitle}
+                    </p>
+                  </div>
+
+                  {/* Sacred Mantra & Footer on Center Card */}
+                  <div className="absolute bottom-4 inset-x-3 text-center">
+                    <div className="px-3 py-2 rounded-2xl bg-black/40 backdrop-blur-md border border-white/20 shadow-inner">
+                      <p className="text-xs font-bold text-amber-200 tracking-wide drop-shadow">
+                        {deity.mantra}
+                      </p>
+                      <div className="mt-1 flex items-center justify-center gap-1 text-[10px] text-white/90 font-medium">
+                        <Sparkles className="w-2.5 h-2.5 text-yellow-300" />
+                        <span>Craft with your name & photo</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Hover Sparkle Badge */}
+                  <div className="absolute inset-0 border-2 border-white/0 group-hover:border-white/40 rounded-3xl transition-colors duration-300 pointer-events-none" />
+                </motion.div>
+              );
+            })}
           </div>
         </div>
       </main>
     </div>
   );
 };
+

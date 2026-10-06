@@ -29,12 +29,14 @@ import {
   MessageCircleQuestion,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useCreatives } from '../../contexts/CreativesContext';
 import { ApiService } from '../../services/api';
 import { ReligionType } from '../../types';
 
 export const ProfilePage: React.FC = () => {
   const navigate = useNavigate();
   const { user, userPhotoUrl, updateUserPhoto, updateUserProfile, token, logout } = useAuth();
+  const { creations, favorites, downloadsCount } = useCreatives();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [copiedHandle, setCopiedHandle] = useState(false);
@@ -141,7 +143,7 @@ export const ProfilePage: React.FC = () => {
           icon: Sparkles,
           iconColor: 'text-purple-600 bg-purple-50',
           path: '/creations',
-          badge: '12 Items',
+          badge: `${creations.length} ${creations.length === 1 ? 'Item' : 'Items'}`,
         },
         {
           label: 'Favorites & Bookmarks',
@@ -149,7 +151,7 @@ export const ProfilePage: React.FC = () => {
           icon: Heart,
           iconColor: 'text-rose-500 bg-rose-50',
           path: '/favorites',
-          badge: '48 Saved',
+          badge: `${favorites.length} Saved`,
         },
       ],
     },
@@ -322,25 +324,31 @@ export const ProfilePage: React.FC = () => {
             <div className="w-full flex items-center justify-around py-2.5 px-3 rounded-2xl bg-gray-50 border border-gray-100">
               <button
                 onClick={() => navigate('/creations')}
-                className="flex-1 text-center hover:opacity-80 transition"
+                className="flex-1 text-center hover:opacity-80 transition cursor-pointer"
               >
-                <div className="text-base font-bold text-gray-900 leading-tight">12</div>
+                <div className="text-base font-bold text-gray-900 leading-tight">
+                  {creations.length}
+                </div>
                 <div className="text-[11px] font-medium text-gray-400">Creations</div>
               </button>
               <div className="w-[1px] h-6 bg-gray-200" />
               <button
                 onClick={() => navigate('/favorites')}
-                className="flex-1 text-center hover:opacity-80 transition"
+                className="flex-1 text-center hover:opacity-80 transition cursor-pointer"
               >
-                <div className="text-base font-bold text-gray-900 leading-tight">48</div>
+                <div className="text-base font-bold text-gray-900 leading-tight">
+                  {favorites.length}
+                </div>
                 <div className="text-[11px] font-medium text-gray-400">Favorites</div>
               </button>
               <div className="w-[1px] h-6 bg-gray-200" />
               <button
                 onClick={() => navigate('/creations')}
-                className="flex-1 text-center hover:opacity-80 transition"
+                className="flex-1 text-center hover:opacity-80 transition cursor-pointer"
               >
-                <div className="text-base font-bold text-gray-900 leading-tight">85</div>
+                <div className="text-base font-bold text-gray-900 leading-tight">
+                  {downloadsCount}
+                </div>
                 <div className="text-[11px] font-medium text-gray-400">Downloads</div>
               </button>
             </div>
