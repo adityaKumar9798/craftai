@@ -410,26 +410,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Real Google OAuth Login with Firebase & Firestore database
   const loginWithGoogle = async (): Promise<UserProfile | null> => {
     if (isFirebaseConfigured && auth) {
-      console.log('[Auth] Initiating Google sign-in with resolver...');
+      console.log('[Auth] Initiating Google sign-in...');
       let res: any = null;
+
+      // On mobile / small screens (like Android/iPhone emulators or phones), use redirect directly to avoid popup double-trigger
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
+
+      if (isMobile) {
+        await signInWithRedirect(auth, googleProvider);
+        return null;
+      }
+
+      // On Desktop: use standard popup
       try {
-        res = await signInWithPopup(auth, googleProvider, browserPopupRedirectResolver);
+        res = await signInWithPopup(auth, googleProvider);
       } catch (popupErr: any) {
-        console.warn('[Auth] Popup sign-in notice, attempting redirect flow fallback:', popupErr);
-        if (
-          popupErr.code === 'auth/popup-blocked' ||
-          popupErr.code === 'auth/popup-closed-by-user' ||
-          popupErr.code === 'auth/cancelled-popup-request' ||
-          popupErr.message?.includes('Cross-Origin-Opener-Policy') ||
-          popupErr.message?.includes('popup')
-        ) {
-          try {
-            await signInWithRedirect(auth, googleProvider, browserPopupRedirectResolver);
-            return null;
-          } catch (redErr: any) {
-            console.error('[Auth] Redirect sign-in failed:', redErr);
-            throw redErr;
-          }
+        console.warn('[Auth] Popup notice:', popupErr);
+        if (popupErr.code === 'auth/popup-closed-by-user') {
+          // User closed popup window, do not trigger a second redirect
+          return null;
+        }
+        if (popupErr.code === 'auth/popup-blocked') {
+          // Only redirect if popup is strictly blocked by browser
+          await signInWithRedirect(auth, googleProvider);
+          return null;
         }
         throw popupErr;
       }
