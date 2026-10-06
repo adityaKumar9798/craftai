@@ -37,7 +37,11 @@ export const SignupPage: React.FC = () => {
   // Automatically navigate as soon as user is authenticated (e.g. from Google login)
   useEffect(() => {
     if (user) {
-      navigate('/home');
+      if (user.religion && user.username) {
+        navigate('/home');
+      } else {
+        navigate('/setup-profile');
+      }
     }
   }, [user, navigate]);
 

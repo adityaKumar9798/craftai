@@ -50,7 +50,11 @@ export const LoginPage: React.FC = () => {
   // Automatically navigate as soon as user state is populated
   useEffect(() => {
     if (user) {
-      navigate('/home');
+      if (user.religion && user.username) {
+        navigate('/home');
+      } else {
+        navigate('/setup-profile');
+      }
     }
   }, [user, navigate]);
 
