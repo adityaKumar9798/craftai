@@ -420,8 +420,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           authDomain: firebaseConfig.authDomain,
           projectId: firebaseConfig.projectId,
         });
+        console.log('[Auth] Starting signInWithPopup...');
         res = await signInWithPopup(auth, googleProvider);
         console.log('[Auth] Popup sign-in successful:', res?.user?.email);
+        console.log('[Auth] User UID:', res?.user?.uid);
+        console.log('[Auth] User exists in auth:', !!res?.user);
       } catch (popupErr: any) {
         console.error('[Auth] Popup error:', popupErr.code, popupErr.message);
         console.error('[Auth] Full error details:', popupErr);
@@ -465,9 +468,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Check Firestore to see if user has already chosen username/religion
       if (db) {
         try {
+          console.log('[Auth] Checking Firestore for existing user:', res.user.uid);
           const userRef = doc(db, 'users', res.user.uid);
           const snap = await withTimeout(getDoc(userRef), 2000);
           if (snap.exists()) {
+            console.log('[Auth] User exists in Firestore, updating lastLoginAt');
             const data = snap.data();
             profile = {
               ...profile,
@@ -487,11 +492,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             withTimeout(setDoc(userRef, { lastLoginAt: new Date().toISOString() }, { merge: true }), 1500).catch(() => {});
           } else {
             // Save newly created Google user profile in Firestore
+            console.log('[Auth] New user, saving to Firestore:', profile);
             await withTimeout(setDoc(userRef, profile, { merge: true }), 1500).catch(() => {});
+            console.log('[Auth] User saved to Firestore successfully');
           }
         } catch (fsErr) {
-          console.warn('[Firestore] Google login fetch notice:', fsErr);
+          console.error('[Firestore] Error saving user:', fsErr);
         }
+      } else {
+        console.warn('[Auth] Firestore db is not available');
       }
 
       // Set user immediately in state and storage
