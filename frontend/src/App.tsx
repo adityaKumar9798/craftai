@@ -8,14 +8,10 @@ import { useAuth } from './contexts/AuthContext';
 // Public Pages
 import { SplashPage } from './pages/public/SplashPage';
 import { LandingPage } from './pages/public/LandingPage';
-import { SignupPage } from './pages/public/SignupPage';
-import { LoginPage } from './pages/public/LoginPage';
-import { ForgotPasswordPage } from './pages/public/ForgotPasswordPage';
+import { GuestAccountPage } from './pages/public/GuestAccountPage';
 import { AddPhotoPage } from './pages/public/AddPhotoPage';
 import { PhotoProcessingPage } from './pages/public/PhotoProcessingPage';
 import { MoodSelectionPage } from './pages/public/MoodSelectionPage';
-
-import { ProfileSetupPage } from './pages/public/ProfileSetupPage';
 
 // User Dashboard & App Pages
 import { HomeDashboard } from './pages/user/HomeDashboard';
@@ -51,16 +47,9 @@ const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 
 /** Redirects non-admins away; also requires login */
 const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { isAuthenticated, isAdmin, loading } = useAuth();
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
-        <div className="w-8 h-8 border-3 border-purple-600 border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    );
-  }
-  if (!isAuthenticated) return <Navigate to="/login" replace />;
-  if (!isAdmin) return <Navigate to="/home" replace />;
+  const isAdminLoggedIn = localStorage.getItem('admin_logged_in') === 'true';
+
+  if (!isAdminLoggedIn) return <Navigate to="/admin/login" replace />;
   return <>{children}</>;
 };
 
@@ -76,10 +65,7 @@ export const App: React.FC = () => {
             {/* ── PUBLIC (no login required) ─────────────────────────── */}
             <Route path="/" element={<SplashPage />} />
             <Route path="/onboarding" element={<LandingPage />} />
-            <Route path="/signup" element={<SignupPage />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-            <Route path="/setup-profile" element={<ProfileSetupPage />} />
+            <Route path="/guest-account" element={<GuestAccountPage />} />
 
             {/* ── SEMI-PROTECTED (part of post-login flow) ───────────── */}
             <Route path="/add-photo" element={<PrivateRoute><AddPhotoPage /></PrivateRoute>} />

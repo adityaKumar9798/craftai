@@ -100,13 +100,7 @@ export const LandingPage: React.FC = () => {
         {/* Top Right CTA */}
         <div className="flex items-center gap-3">
           <button
-            onClick={() => navigate('/login')}
-            className="text-sm font-semibold text-gray-700 hover:text-gray-900 px-3 py-2 transition cursor-pointer"
-          >
-            Login
-          </button>
-          <button
-            onClick={() => navigate('/signup')}
+            onClick={() => navigate('/guest-account')}
             className="px-5 py-2.5 rounded-full brand-gradient text-white text-sm font-bold shadow-md shadow-purple-500/20 hover:opacity-95 transition cursor-pointer"
           >
             Get Started
@@ -135,7 +129,7 @@ export const LandingPage: React.FC = () => {
           {/* Action Buttons */}
           <div className="mt-8 flex flex-col sm:flex-row items-center gap-4 justify-center md:justify-start">
             <button
-              onClick={() => navigate('/signup')}
+              onClick={() => navigate('/guest-account')}
               className="w-full sm:w-auto px-8 py-4 rounded-full brand-gradient text-white text-base font-bold shadow-xl shadow-purple-500/25 hover:scale-[1.02] active:scale-[0.98] transition flex items-center justify-center gap-2 cursor-pointer"
             >
               Get Started

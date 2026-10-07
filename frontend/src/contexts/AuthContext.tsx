@@ -40,6 +40,7 @@ interface AuthContextType {
   updateUserPhoto: (photoUrl: string) => Promise<void>;
   updateUserProfile: (updates: Partial<UserProfile>) => Promise<void>;
   setRoleAsAdmin: (isAdmin: boolean) => Promise<void>;
+  createGuestAccount: (firstName: string, lastName: string) => Promise<UserProfile>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -537,6 +538,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Create Guest Account without Firebase Auth
+  const createGuestAccount = async (firstName: string, lastName: string): Promise<UserProfile> => {
+    const username = `user${Date.now()}`;
+    const guestUid = `guest_${username}`;
+
+    const profile: UserProfile = {
+      uid: guestUid,
+      name: `${firstName} ${lastName}`,
+      firstName,
+      lastName,
+      username,
+      email: '',
+      photoUrl: '',
+      role: 'user',
+      plan: 'Free User',
+      createdAt: new Date().toISOString(),
+      lastLoginAt: new Date().toISOString(),
+      onboardingCompleted: true,
+    };
+
+    setUser(profile);
+    localStorage.setItem('craft_ai_user', JSON.stringify(profile));
+    localStorage.setItem('craft_ai_token', 'guest_token');
+
+    // Sync with backend
+    try {
+      fetch('/api/users/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(profile),
+      }).catch(() => {});
+    } catch {}
+
+    return profile;
+  };
+
   const logout = async () => {
     if (isFirebaseConfigured && auth) {
       try {
@@ -646,6 +683,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         updateUserPhoto,
         updateUserProfile,
         setRoleAsAdmin,
+        createGuestAccount,
       }}
     >
       {children}
