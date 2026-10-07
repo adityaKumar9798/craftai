@@ -100,6 +100,12 @@ export const LandingPage: React.FC = () => {
         {/* Top Right CTA */}
         <div className="flex items-center gap-3">
           <button
+            onClick={() => navigate('/admin/login')}
+            className="text-xs font-semibold text-gray-500 hover:text-purple-600 px-3 py-2 transition cursor-pointer"
+          >
+            Admin
+          </button>
+          <button
             onClick={() => navigate('/guest-account')}
             className="px-5 py-2.5 rounded-full brand-gradient text-white text-sm font-bold shadow-md shadow-purple-500/20 hover:opacity-95 transition cursor-pointer"
           >
@@ -245,6 +251,16 @@ export const LandingPage: React.FC = () => {
           </div>
         </div>
       </main>
+
+      {/* Footer with Admin Link */}
+      <footer className="px-6 py-4 text-center">
+        <button
+          onClick={() => navigate('/admin/login')}
+          className="text-xs text-gray-400 hover:text-purple-600 transition"
+        >
+          Admin Login
+        </button>
+      </footer>
     </div>
   );
 };
