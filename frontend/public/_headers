@@ -1,5 +1,4 @@
 /*
-  Cross-Origin-Opener-Policy: same-origin-allow-popups
   Access-Control-Allow-Origin: *
   Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS
   Access-Control-Allow-Headers: *
