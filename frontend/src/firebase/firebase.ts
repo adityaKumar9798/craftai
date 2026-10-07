@@ -38,7 +38,7 @@ import {
 } from 'firebase/firestore';
 
 // Pure environment variable loading - Zero hardcoded keys in source code
-export const firebaseConfig = {
+const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
   databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL,
@@ -130,5 +130,6 @@ export {
   updateFirebaseProfile,
   browserPopupRedirectResolver,
   browserLocalPersistence,
+  firebaseConfig,
 };
 export type { FirebaseUser };

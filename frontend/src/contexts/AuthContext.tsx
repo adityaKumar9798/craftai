@@ -21,6 +21,7 @@ import {
   isFirebaseConfigured,
   browserPopupRedirectResolver,
 } from '../firebase/firebase';
+import { firebaseConfig } from '../firebase/firebase';
 
 interface AuthContextType {
   user: UserProfile | null;
@@ -415,10 +416,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // On Desktop: use standard popup
       try {
         console.log('[Auth] Using popup flow for desktop');
+        console.log('[Auth] Firebase config:', {
+          authDomain: firebaseConfig.authDomain,
+          projectId: firebaseConfig.projectId,
+        });
         res = await signInWithPopup(auth, googleProvider);
         console.log('[Auth] Popup sign-in successful:', res?.user?.email);
       } catch (popupErr: any) {
         console.error('[Auth] Popup error:', popupErr.code, popupErr.message);
+        console.error('[Auth] Full error details:', popupErr);
         if (popupErr.code === 'auth/popup-closed-by-user') {
           // User closed popup window, do not trigger a second redirect
           console.log('[Auth] User closed popup');
@@ -429,6 +435,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.log('[Auth] Popup blocked, using redirect');
           await signInWithRedirect(auth, googleProvider);
           return null;
+        }
+        if (popupErr.code === 'auth/internal-error') {
+          console.error('[Auth] Internal error - likely Firebase config issue');
+          console.error('[Auth] Check authDomain in Firebase console matches:', firebaseConfig.authDomain);
         }
         throw popupErr;
       }
