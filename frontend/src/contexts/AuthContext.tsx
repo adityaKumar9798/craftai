@@ -30,7 +30,7 @@ interface AuthContextType {
   isAdmin: boolean;
   loading: boolean;
   login: (email: string, pass: string) => Promise<void>;
-  signup: (name: string, email: string, pass: string) => Promise<{ email: string; name: string }>;
+  signup: (email: string, pass: string, name?: string) => Promise<{ email: string; name: string }>;
   resendVerificationEmail: (email: string, pass?: string) => Promise<boolean>;
   loginWithGoogle: () => Promise<UserProfile | null>;
   quickLogin: (role: 'admin' | 'user') => Promise<void>;
@@ -147,19 +147,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
         if (fbUser) {
-          // If signed in via email/password and NOT verified, do not auto-authenticate
-          const isEmailPassword = fbUser.providerData.some((p) => p.providerId === 'password');
-          if (isEmailPassword && !fbUser.emailVerified) {
-            setUser(null);
-            setUserPhotoUrl('');
-            setToken(null);
-            localStorage.removeItem('craft_ai_user');
-            localStorage.removeItem('craft_ai_photo');
-            localStorage.removeItem('craft_ai_token');
-            setLoading(false);
-            return;
-          }
-
           try {
             const idToken = await fbUser.getIdToken();
             setToken(idToken);
@@ -253,8 +240,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  // Real Email & Password Sign Up with mandatory Email Verification Link
-  const signup = async (name: string, emailOrUsername: string, pass: string): Promise<{ email: string; name: string }> => {
+  // Real Email & Password Sign Up
+  const signup = async (emailOrUsername: string, pass: string, name?: string): Promise<{ email: string; name: string }> => {
     if (isFirebaseConfigured && auth) {
       const email = emailOrUsername.trim().includes('@')
         ? emailOrUsername.trim()
@@ -263,37 +250,58 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // 1. Create User in Firebase Auth
       const cred = await createUserWithEmailAndPassword(auth, email, pass);
 
-      // 2. Set user displayName
-      try {
-        await updateFirebaseProfile(cred.user, { displayName: name });
-      } catch {}
-
-      // 3. Send Firebase Email Verification Link
-      try {
-        await sendEmailVerification(cred.user, {
-          url: `${window.location.origin}/login?verified=true&email=${encodeURIComponent(email)}`,
-          handleCodeInApp: false,
-        });
-        console.log('[Auth] Verification email sent to:', email);
-      } catch (evErr) {
-        console.warn('[Auth] Verification send notice:', evErr);
+      // 2. Set user displayName if given
+      if (name) {
+        try {
+          await updateFirebaseProfile(cred.user, { displayName: name });
+        } catch {}
       }
 
-      // 4. Immediately sign out the unverified session so user cannot log in without verification
-      await signOut(auth);
-      setUser(null);
-      setToken(null);
-      localStorage.removeItem('craft_ai_user');
-      localStorage.removeItem('craft_ai_photo');
-      localStorage.removeItem('craft_ai_token');
+      // 3. Keep user authenticated & setup initial profile
+      const idToken = await cred.user.getIdToken();
+      setToken(idToken);
+      localStorage.setItem('craft_ai_token', idToken);
 
-      return { email, name };
+      let profile: UserProfile = {
+        uid: cred.user.uid,
+        name: name || cred.user.displayName || email.split('@')[0],
+        email,
+        photoUrl: '',
+        role: email.toLowerCase().includes('admin') ? 'admin' : 'user',
+        plan: email.toLowerCase().includes('admin') ? 'Administrator' : 'Free User',
+        createdAt: new Date().toISOString(),
+        lastLoginAt: new Date().toISOString(),
+      };
+
+      if (db) {
+        try {
+          const userRef = doc(db, 'users', cred.user.uid);
+          await withTimeout(setDoc(userRef, profile, { merge: true }), 1500).catch(() => {});
+        } catch (fsErr) {
+          console.warn('[Firestore Client] Notice:', fsErr);
+        }
+      }
+
+      // Sync with backend
+      try {
+        fetch('/api/users/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(profile),
+        }).catch(() => {});
+      } catch {}
+
+      setUser(profile);
+      localStorage.setItem('craft_ai_user', JSON.stringify(profile));
+      realtimeStore.saveUser(profile).catch(() => {});
+
+      return { email, name: profile.name };
     } else {
       throw new Error('Firebase configuration missing.');
     }
   };
 
-  // Real Email & Password Login (Verifies email verification before allowing access)
+  // Real Email & Password Login
   const login = async (emailOrUsername: string, pass: string) => {
     if (isFirebaseConfigured && auth) {
       const email = emailOrUsername.trim().includes('@')
@@ -301,24 +309,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         : `${emailOrUsername.trim().toLowerCase()}@craftai.com`;
 
       const cred = await signInWithEmailAndPassword(auth, email, pass);
-
-      // Strict check: Password accounts MUST be email verified
-      const isEmailPassword = cred.user.providerData.some((p) => p.providerId === 'password');
-      if (isEmailPassword && !cred.user.emailVerified) {
-        // Sign out immediately
-        await signOut(auth);
-        setUser(null);
-        setToken(null);
-        localStorage.removeItem('craft_ai_user');
-        localStorage.removeItem('craft_ai_photo');
-        localStorage.removeItem('craft_ai_token');
-
-        const err: any = new Error('Your email address is not verified yet. Please check your inbox and click the verification link before logging in.');
-        err.code = 'auth/unverified-email';
-        err.email = email;
-        throw err;
-      }
-
       const idToken = await cred.user.getIdToken();
       setToken(idToken);
       localStorage.setItem('craft_ai_token', idToken);
