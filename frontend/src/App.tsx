@@ -41,7 +41,7 @@ const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => 
       </div>
     );
   }
-  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (!isAuthenticated) return <Navigate to="/guest-account" replace />;
   return <>{children}</>;
 };
 
@@ -66,6 +66,9 @@ export const App: React.FC = () => {
             <Route path="/" element={<SplashPage />} />
             <Route path="/onboarding" element={<LandingPage />} />
             <Route path="/guest-account" element={<GuestAccountPage />} />
+            <Route path="/get-started" element={<GuestAccountPage />} />
+            <Route path="/login" element={<Navigate to="/guest-account" replace />} />
+            <Route path="/signup" element={<Navigate to="/guest-account" replace />} />
 
             {/* ── SEMI-PROTECTED (part of post-login flow) ───────────── */}
             <Route path="/add-photo" element={<PrivateRoute><AddPhotoPage /></PrivateRoute>} />

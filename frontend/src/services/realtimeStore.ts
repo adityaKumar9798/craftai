@@ -984,6 +984,10 @@ class RealtimeStore {
         await setDoc(doc(db, 'users', user.uid), {
           uid: user.uid,
           name: user.name,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          username: user.username,
+          religion: user.religion,
           email: user.email,
           photoUrl: user.photoUrl,
           role: user.role,

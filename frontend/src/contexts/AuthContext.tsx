@@ -538,29 +538,78 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Create Guest Account without Firebase Auth
+  // Create Guest Account with incremental numbering and save to Firebase
   const createGuestAccount = async (firstName: string, lastName: string): Promise<UserProfile> => {
-    const username = `user${Date.now()}`;
-    const guestUid = `guest_${username}`;
+    let guestNumber = 1;
+
+    // Check Firebase for synced guest counter across sessions
+    if (db) {
+      try {
+        const counterRef = doc(db, 'system_counters', 'guest_users');
+        const counterSnap = await getDoc(counterRef);
+        if (counterSnap.exists()) {
+          guestNumber = (counterSnap.data()?.count || 0) + 1;
+        } else {
+          const currentCount = parseInt(localStorage.getItem('craft_ai_guest_counter') || '0', 10);
+          guestNumber = Math.max(currentCount + 1, 1);
+        }
+        await setDoc(counterRef, { count: guestNumber, lastUpdated: new Date().toISOString() }, { merge: true });
+      } catch (err) {
+        console.warn('[Firestore Counter] Using local counter:', err);
+        const currentCount = parseInt(localStorage.getItem('craft_ai_guest_counter') || '0', 10);
+        guestNumber = currentCount + 1;
+      }
+    } else {
+      const currentCount = parseInt(localStorage.getItem('craft_ai_guest_counter') || '0', 10);
+      guestNumber = currentCount + 1;
+    }
+    localStorage.setItem('craft_ai_guest_counter', String(guestNumber));
+
+    const fName = firstName.trim();
+    const lName = lastName.trim();
+    const fullName = `${fName} ${lName}`.trim();
+    const guestTitle = `Guest User ${guestNumber}`;
+    const cleanUsername = `@${fName.toLowerCase().replace(/[^a-z0-9]/g, '') || 'guest'}_${lName.toLowerCase().replace(/[^a-z0-9]/g, '') || guestNumber}`;
+    const guestUid = `guest_user_${guestNumber}`;
+    const guestEmail = `guest${guestNumber}@craftai.app`;
 
     const profile: UserProfile = {
       uid: guestUid,
-      name: `${firstName} ${lastName}`,
-      firstName,
-      lastName,
-      username,
-      email: '',
+      name: fullName || guestTitle,
+      firstName: fName,
+      lastName: lName,
+      username: cleanUsername,
+      email: guestEmail,
       photoUrl: '',
       role: 'user',
       plan: 'Free User',
+      religion: 'hindu' as any,
+      privacyAccepted: true,
+      onboardingCompleted: true,
       createdAt: new Date().toISOString(),
       lastLoginAt: new Date().toISOString(),
-      onboardingCompleted: true,
     };
+
+    // Save to Firebase Firestore
+    if (db) {
+      try {
+        const userRef = doc(db, 'users', guestUid);
+        await setDoc(userRef, {
+          ...profile,
+          guestNumber,
+          guestTitle,
+          displayName: `${guestTitle} (${fullName})`,
+        }, { merge: true });
+        console.log(`[Auth] ${guestTitle} saved to Firestore:`, guestUid);
+      } catch (fsErr) {
+        console.warn('[Firestore Client] Guest save notice:', fsErr);
+      }
+    }
 
     setUser(profile);
     localStorage.setItem('craft_ai_user', JSON.stringify(profile));
-    localStorage.setItem('craft_ai_token', 'guest_token');
+    localStorage.setItem('craft_ai_token', `guest_token_${guestNumber}`);
+    setToken(`guest_token_${guestNumber}`);
 
     // Sync with backend
     try {
@@ -570,6 +619,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         body: JSON.stringify(profile),
       }).catch(() => {});
     } catch {}
+
+    realtimeStore.saveUser(profile).catch(() => {});
 
     return profile;
   };

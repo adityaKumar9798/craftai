@@ -132,7 +132,7 @@ export class UserController {
 
   static async syncUser(req: any, res: Response): Promise<void> {
     try {
-      const { uid, name, email, photoUrl, role, plan, createdAt } = req.body;
+      const { uid, name, firstName, lastName, username, religion, guestNumber, guestTitle, email, photoUrl, role, plan, createdAt } = req.body;
       if (!uid) {
         res.status(400).json({ success: false, message: 'User ID is required' });
         return;
@@ -146,6 +146,12 @@ export class UserController {
         const updatedData = {
           uid,
           name: name || existingData?.name || email?.split('@')[0] || 'Creator',
+          firstName: firstName || existingData?.firstName || '',
+          lastName: lastName || existingData?.lastName || '',
+          username: username || existingData?.username || '',
+          religion: religion || existingData?.religion || 'hindu',
+          guestNumber: guestNumber || existingData?.guestNumber || null,
+          guestTitle: guestTitle || existingData?.guestTitle || '',
           email: email || existingData?.email || '',
           photoUrl: photoUrl || existingData?.photoUrl || '',
           role: existingData?.role || role || (email?.toLowerCase().includes('admin') ? 'admin' : 'user'),
