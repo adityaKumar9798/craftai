@@ -407,21 +407,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
 
       if (isMobile) {
+        console.log('[Auth] Using redirect flow for mobile');
         await signInWithRedirect(auth, googleProvider);
         return null;
       }
 
       // On Desktop: use standard popup
       try {
+        console.log('[Auth] Using popup flow for desktop');
         res = await signInWithPopup(auth, googleProvider);
+        console.log('[Auth] Popup sign-in successful:', res?.user?.email);
       } catch (popupErr: any) {
-        console.warn('[Auth] Popup notice:', popupErr);
+        console.error('[Auth] Popup error:', popupErr.code, popupErr.message);
         if (popupErr.code === 'auth/popup-closed-by-user') {
           // User closed popup window, do not trigger a second redirect
+          console.log('[Auth] User closed popup');
           return null;
         }
         if (popupErr.code === 'auth/popup-blocked') {
           // Only redirect if popup is strictly blocked by browser
+          console.log('[Auth] Popup blocked, using redirect');
           await signInWithRedirect(auth, googleProvider);
           return null;
         }
