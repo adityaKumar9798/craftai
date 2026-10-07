@@ -7,7 +7,6 @@
   for = "/*"
   [headers.values]
     Cross-Origin-Opener-Policy = "same-origin-allow-popups"
-    Cross-Origin-Embedder-Policy = "require-corp"
 
 [[redirects]]
   from = "/api/*"
