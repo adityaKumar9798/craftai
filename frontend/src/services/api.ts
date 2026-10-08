@@ -114,7 +114,48 @@ export class ApiService {
   ): Promise<{ url: string; resourceType?: 'image' | 'video' }> {
     const isVid = options?.isVideo || file.type.startsWith('video/') || /\.(mp4|mov|webm|avi|mkv)$/i.test(file.name);
     
-    // 1. Try Backend API first
+    // 1. Direct Cloudinary Client-side Signed Upload (Bypasses Netlify 6MB body limit & 413 Payload Too Large)
+    const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || 'ehn1cfwp';
+    const apiKey = import.meta.env.VITE_CLOUDINARY_API_KEY || '498817649988124';
+    const apiSecret = import.meta.env.VITE_CLOUDINARY_API_SECRET || 'DXnHrxuAqQjkCsBt-Yh1tJl-SjU';
+
+    if (cloudName && apiKey && apiSecret) {
+      try {
+        const timestamp = Math.round(Date.now() / 1000);
+        // Compute SHA-1 signature
+        const message = `timestamp=${timestamp}${apiSecret}`;
+        const msgUint8 = new TextEncoder().encode(message);
+        const hashBuffer = await crypto.subtle.digest('SHA-1', msgUint8);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const signature = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+
+        const cldFormData = new FormData();
+        cldFormData.append('file', file);
+        cldFormData.append('api_key', apiKey);
+        cldFormData.append('timestamp', timestamp.toString());
+        cldFormData.append('signature', signature);
+
+        const endpoint = `https://api.cloudinary.com/v1_1/${cloudName}/${isVid ? 'video' : 'image'}/upload`;
+        const cldRes = await fetch(endpoint, {
+          method: 'POST',
+          body: cldFormData,
+        });
+
+        if (cldRes.ok) {
+          const cldData = await cldRes.json();
+          if (cldData.secure_url) {
+            return {
+              url: cldData.secure_url,
+              resourceType: isVid ? 'video' : 'image',
+            };
+          }
+        }
+      } catch (cldErr) {
+        console.warn('[ApiService] Direct Cloudinary signed upload attempt notice:', cldErr);
+      }
+    }
+
+    // 2. Try Backend API (for smaller files or when direct upload fallback is needed)
     try {
       const formData = new FormData();
       formData.append('photo', file);
@@ -144,35 +185,7 @@ export class ApiService {
       console.warn('[ApiService] Backend upload attempt skipped:', err);
     }
 
-    // 2. Direct Cloudinary Client-side upload if cloud name is present
-    const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
-    if (cloudName) {
-      try {
-        const cldFormData = new FormData();
-        cldFormData.append('file', file);
-        cldFormData.append('upload_preset', 'ml_default');
-
-        const endpoint = `https://api.cloudinary.com/v1_1/${cloudName}/${isVid ? 'video' : 'image'}/upload`;
-        const cldRes = await fetch(endpoint, {
-          method: 'POST',
-          body: cldFormData,
-        });
-
-        if (cldRes.ok) {
-          const cldData = await cldRes.json();
-          if (cldData.secure_url) {
-            return {
-              url: cldData.secure_url,
-              resourceType: isVid ? 'video' : 'image',
-            };
-          }
-        }
-      } catch (cldErr) {
-        console.warn('[ApiService] Direct Cloudinary upload attempt notice:', cldErr);
-      }
-    }
-
-    // 3. Resilient Base64 Fallback (Guaranteed to work on Netlify without backend)
+    // 3. Resilient Base64 Fallback
     const base64: string = await new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result as string);

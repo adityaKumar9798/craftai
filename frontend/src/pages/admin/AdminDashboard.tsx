@@ -551,25 +551,18 @@ export const AdminDashboard: React.FC = () => {
   const uploadPostMedia = async (file: File) => {
     setUploadingImage(true);
     try {
-      const fd = new FormData();
-      fd.append('photo', file);
-      fd.append('file', file);
-      fd.append('isTemplate', 'true');
-      fd.append('target', 'template');
       const isVid = file.type.startsWith('video/') || /\.(mp4|mov|webm|avi|mkv)$/i.test(file.name);
-      if (isVid) fd.append('isVideo', 'true');
+      const res = await ApiService.uploadMedia(file, { isTemplate: true, isVideo: isVid });
 
-      const res = await fetch('/api/upload/photo', { method: 'POST', body: fd });
-      if (!res.ok) throw new Error('Upload failed');
-      const data = await res.json();
-      const url = data?.data?.secureUrl || data?.data?.url || data?.data?.photoUrl || data?.photoUrl || '';
-      if (url) {
+      if (res && res.url) {
         setPostFormData((prev) => ({
           ...prev,
-          assetUrl: url,
-          type: isVid || data?.data?.resourceType === 'video' ? 'video' : prev.type,
+          assetUrl: res.url,
+          type: isVid || res.resourceType === 'video' ? 'video' : prev.type,
         }));
-      } else throw new Error('No URL returned from Cloudinary');
+      } else {
+        throw new Error('Could not upload media');
+      }
     } catch (err: any) {
       alert('Upload failed: ' + (err?.message || 'Please try again.'));
     } finally {
