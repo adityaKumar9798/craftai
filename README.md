@@ -115,7 +115,7 @@ FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY----
 VITE_API_BASE_URL=http://localhost:5000/api
 
 # Firebase Web App
-VITE_FIREBASE_API_KEY=AIzaSy...
+VITE_FIREBASE_API_KEY=your_firebase_api_key
 VITE_FIREBASE_AUTH_DOMAIN=your-app.firebaseapp.com
 VITE_FIREBASE_PROJECT_ID=your-app
 VITE_FIREBASE_STORAGE_BUCKET=your-app.appspot.com

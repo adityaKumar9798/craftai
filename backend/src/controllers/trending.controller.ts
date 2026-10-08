@@ -2,8 +2,8 @@ import { Request, Response } from 'express';
 import { db, isFirebaseConfigured } from '../config/firebase.js';
 
 const COLLECTION = 'trending_topics';
-const PROJECT_ID = process.env.FIREBASE_PROJECT_ID || 'carft-ai';
-const API_KEY = process.env.FIREBASE_WEB_API_KEY || 'AIzaSyAa91hu_Mmp4nNAeOqwdTizhYB-6zJEd5A';
+const PROJECT_ID = process.env.FIREBASE_PROJECT_ID || '';
+const API_KEY = process.env.FIREBASE_WEB_API_KEY || '';
 
 // Firestore REST API base (works with Web API Key + user ID token for write, or open rules for read)
 const FIRESTORE_REST_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
