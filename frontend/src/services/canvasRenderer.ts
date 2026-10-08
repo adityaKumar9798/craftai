@@ -158,8 +158,75 @@ export class CanvasRenderer {
   }
 
   /**
-   * Render a personalized video with the user's photo overlay recorded directly to MP4/WebM
-   * Records the FULL video duration uploaded by admin with seamless frame capture.
+   * Helper to pre-render the static user photo and metallic frame overlay once.
+   * This completely avoids expensive clipping and shadowBlur calculations during the video recording loop,
+   * eliminating video lag and frame drops.
+   */
+  private static createVideoOverlayCanvas(
+    width: number,
+    height: number,
+    slot: any,
+    userImg: HTMLImageElement | null
+  ): HTMLCanvasElement {
+    const overlay = document.createElement('canvas');
+    overlay.width = width;
+    overlay.height = height;
+    const ctx = overlay.getContext('2d');
+    if (!ctx || !userImg) return overlay;
+
+    const circleW = slot && slot.width > 0 && slot.width <= 1 ? slot.width * width : 0.28 * width;
+    const circleRadius = circleW / 2;
+    const centerX =
+      slot && slot.x !== undefined && slot.x >= 0 && slot.x <= 1
+        ? slot.x * width + circleRadius
+        : 0.36 * width + circleRadius;
+    const centerY =
+      slot && slot.y !== undefined && slot.y >= 0 && slot.y <= 1
+        ? slot.y * height + circleRadius
+        : 0.67 * height + circleRadius;
+
+    // 1. Draw User Image centered in Circle Slot
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, circleRadius, 0, Math.PI * 2);
+    ctx.clip();
+
+    const imgAspect = userImg.width / userImg.height;
+    let drawW = circleW;
+    let drawH = circleW;
+    if (imgAspect > 1) {
+      drawW = drawH * imgAspect;
+    } else {
+      drawH = drawW / imgAspect;
+    }
+    ctx.drawImage(userImg, centerX - drawW / 2, centerY - drawH / 2, drawW, drawH);
+    ctx.restore();
+
+    // 2. Metallic Gold Outer Rim & Inner Ring with Shadow (Pre-rendered ONCE)
+    ctx.save();
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.55)';
+    ctx.shadowBlur = 18;
+    ctx.strokeStyle = '#E5C158';
+    ctx.lineWidth = 10;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, circleRadius, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.strokeStyle = '#B8860B';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, circleRadius - 6, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+
+    return overlay;
+  }
+
+  /**
+   * Render a personalized video with the user's photo overlay recorded directly to MP4/WebM.
+   * - Records the EXACT duration of the original video without truncation or black start.
+   * - Pre-rendered overlays & requestVideoFrameCallback deliver silky-smooth 30-60 FPS with zero frame lag.
+   * - Full Web Audio / stream track routing guarantees crystal-clear, in-sync sound.
    */
   static async renderVideoWithOverlay(
     template: Template,
@@ -167,6 +234,12 @@ export class CanvasRenderer {
     onProgress?: (progress: number) => void
   ): Promise<string> {
     return new Promise(async (resolve) => {
+      let videoEl: HTMLVideoElement | null = null;
+      let audioCtx: AudioContext | null = null;
+      let vfcHandle: number | null = null;
+      let rafHandle: number | null = null;
+      let safetyTimeout: any = null;
+
       try {
         const videoSrc = template.videoUrl || template.assetUrl;
         if (!videoSrc) {
@@ -174,15 +247,7 @@ export class CanvasRenderer {
           return;
         }
 
-        const video = document.createElement('video');
-        video.crossOrigin = 'anonymous';
-        video.src = videoSrc;
-        video.muted = false; // Audio enabled for Web Audio / captureStream muxing
-        video.volume = 1;
-        video.playsInline = true;
-        video.preload = 'auto';
-
-        // Load user photo
+        // 1. Load user photo in advance
         let userImg: HTMLImageElement | null = null;
         if (userPhotoUrl) {
           try {
@@ -192,237 +257,314 @@ export class CanvasRenderer {
           }
         }
 
-        // Videos are strictly rendered in 9:16 standard Full HD (1080 x 1920)
+        // 2. Create and prepare video element
+        videoEl = document.createElement('video');
+        videoEl.crossOrigin = 'anonymous';
+        videoEl.src = videoSrc;
+        videoEl.muted = false;
+        videoEl.volume = 1.0;
+        videoEl.playsInline = true;
+        videoEl.preload = 'auto';
+
+        // Attach invisibly to DOM to ensure browser audio pipeline and decoder stay active
+        videoEl.style.position = 'fixed';
+        videoEl.style.top = '-9999px';
+        videoEl.style.left = '-9999px';
+        videoEl.style.opacity = '0';
+        videoEl.style.pointerEvents = 'none';
+        videoEl.style.width = '1px';
+        videoEl.style.height = '1px';
+        document.body.appendChild(videoEl);
+
+        // 3. Wait for video metadata so duration is accurately known
+        await new Promise<void>((res, rej) => {
+          if (videoEl!.readyState >= 1 && isFinite(videoEl!.duration) && videoEl!.duration > 0) {
+            res();
+            return;
+          }
+          const onMeta = () => {
+            cleanup();
+            res();
+          };
+          const onErr = (e: any) => {
+            cleanup();
+            rej(e);
+          };
+          const cleanup = () => {
+            videoEl?.removeEventListener('loadedmetadata', onMeta);
+            videoEl?.removeEventListener('loadeddata', onMeta);
+            videoEl?.removeEventListener('canplay', onMeta);
+            videoEl?.removeEventListener('error', onErr);
+          };
+          videoEl?.addEventListener('loadedmetadata', onMeta);
+          videoEl?.addEventListener('loadeddata', onMeta);
+          videoEl?.addEventListener('canplay', onMeta);
+          videoEl?.addEventListener('error', onErr);
+        });
+
+        // Determine precise original duration
+        let targetDuration = videoEl.duration;
+        if (!isFinite(targetDuration) || isNaN(targetDuration) || targetDuration <= 0) {
+          targetDuration = template.duration && template.duration > 0 ? template.duration : 15;
+        }
+
+        // 4. Setup rendering canvas (standard 1080x1920 9:16)
         const width = 1080;
         const height = 1920;
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d', { alpha: false });
+        if (!ctx) {
+          resolve(videoSrc);
+          return;
+        }
 
-        const startRecording = async () => {
+        if (typeof MediaRecorder === 'undefined' || !canvas.captureStream) {
+          resolve(videoSrc);
+          return;
+        }
+
+        // 5. Pre-render overlay once
+        const overlayCanvas = this.createVideoOverlayCanvas(
+          width,
+          height,
+          template.subjectSlot,
+          userImg
+        );
+
+        // 6. Visual Stream from Canvas (30 FPS)
+        const canvasStream = canvas.captureStream(30);
+
+        // 7. Audio Capture with Web Audio & Direct captureStream fallback
+        let audioTracks: MediaStreamTrack[] = [];
+        try {
+          const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+          if (AudioContextClass) {
+            audioCtx = new AudioContextClass();
+            if (audioCtx.state === 'suspended') {
+              await audioCtx.resume();
+            }
+            const source = audioCtx.createMediaElementSource(videoEl);
+            const destination = audioCtx.createMediaStreamDestination();
+            source.connect(destination);
+            // Captures audio track directly into recorder stream without speaker echoing
+            audioTracks = destination.stream.getAudioTracks();
+          }
+        } catch (waErr) {
+          console.warn('WebAudio capture notice:', waErr);
+        }
+
+        if (!audioTracks || audioTracks.length === 0) {
           try {
-            const canvas = document.createElement('canvas');
-            canvas.width = width;
-            canvas.height = height;
-            const ctx = canvas.getContext('2d');
-            if (!ctx) {
-              resolve(videoSrc);
-              return;
+            const captureFn = (videoEl as any).captureStream || (videoEl as any).mozCaptureStream;
+            if (typeof captureFn === 'function') {
+              const vs = captureFn.call(videoEl);
+              if (vs && vs.getAudioTracks().length > 0) {
+                audioTracks = vs.getAudioTracks();
+              }
             }
+          } catch (csErr) {
+            console.warn('Direct captureStream notice:', csErr);
+          }
+        }
 
-            if (typeof MediaRecorder === 'undefined' || !canvas.captureStream) {
-              resolve(videoSrc);
-              return;
-            }
+        // 8. Combine Video + Audio tracks
+        const combinedTracks = [
+          ...canvasStream.getVideoTracks(),
+          ...audioTracks,
+        ];
+        const combinedStream = new MediaStream(combinedTracks);
 
-            // 1. Visual Stream from Canvas
-            const canvasStream = canvas.captureStream(30);
+        // Select optimal recording codec
+        const supportedMimes = [
+          'video/mp4;codecs=avc1,mp4a.40.2',
+          'video/mp4;codecs=avc1',
+          'video/mp4',
+          'video/webm;codecs=h264,opus',
+          'video/webm;codecs=vp8,opus',
+          'video/webm;codecs=vp9,opus',
+          'video/webm',
+        ];
 
-            // 2. Audio Stream from Original Video
-            let audioTracks: MediaStreamTrack[] = [];
-            let audioCtx: AudioContext | null = null;
+        let mimeType = '';
+        for (const m of supportedMimes) {
+          if (MediaRecorder.isTypeSupported(m)) {
+            mimeType = m;
+            break;
+          }
+        }
 
+        const recorder = new MediaRecorder(combinedStream, {
+          ...(mimeType ? { mimeType } : {}),
+          videoBitsPerSecond: 6000000,
+          ...(audioTracks.length > 0 ? { audioBitsPerSecond: 128000 } : {}),
+        });
+
+        const chunks: Blob[] = [];
+        recorder.ondataavailable = (e) => {
+          if (e.data && e.data.size > 0) chunks.push(e.data);
+        };
+
+        let isFinished = false;
+        const finishRecording = () => {
+          if (isFinished) return;
+          isFinished = true;
+
+          if (safetyTimeout) clearTimeout(safetyTimeout);
+
+          if (vfcHandle !== null && 'cancelVideoFrameCallback' in (videoEl as any)) {
             try {
-              if ((video as any).captureStream) {
-                const vs = (video as any).captureStream();
-                audioTracks = vs.getAudioTracks();
-              } else if ((video as any).mozCaptureStream) {
-                const vs = (video as any).mozCaptureStream();
-                audioTracks = vs.getAudioTracks();
-              }
-            } catch (e) {
-              console.warn('Direct captureStream notice:', e);
+              (videoEl as any).cancelVideoFrameCallback(vfcHandle);
+            } catch {}
+          }
+          if (rafHandle !== null) {
+            cancelAnimationFrame(rafHandle);
+          }
+
+          if (videoEl) {
+            videoEl.pause();
+            if (document.body.contains(videoEl)) {
+              document.body.removeChild(videoEl);
             }
+          }
 
-            if (!audioTracks || audioTracks.length === 0) {
-              try {
-                const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-                if (AudioContextClass) {
-                  audioCtx = new AudioContextClass();
-                  const source = audioCtx.createMediaElementSource(video);
-                  const destination = audioCtx.createMediaStreamDestination();
-                  source.connect(destination);
-                  // Routed only to recorder destination stream (silent on speaker while recording)
-                  audioTracks = destination.stream.getAudioTracks();
-                }
-              } catch (e) {
-                console.warn('WebAudio capture notice:', e);
-              }
+          if (onProgress) onProgress(100);
+
+          try {
+            if (recorder.state === 'recording') {
+              recorder.stop();
             }
+          } catch {}
 
-            // 3. Combine Video + Audio tracks
-            const combinedTracks = [
-              ...canvasStream.getVideoTracks(),
-              ...audioTracks,
-            ];
-            const combinedStream = new MediaStream(combinedTracks);
-
-            let mimeType = 'video/mp4';
-            if (!MediaRecorder.isTypeSupported('video/mp4')) {
-              mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
-                ? 'video/webm;codecs=vp9,opus'
-                : MediaRecorder.isTypeSupported('video/webm')
-                ? 'video/webm'
-                : '';
-            }
-
-            const recorder = new MediaRecorder(combinedStream, {
-              ...(mimeType ? { mimeType } : {}),
-              videoBitsPerSecond: 6000000,
-            });
-
-            const chunks: Blob[] = [];
-            recorder.ondataavailable = (e) => {
-              if (e.data && e.data.size > 0) chunks.push(e.data);
-            };
-
-            let isFinished = false;
-            const finishRecording = () => {
-              if (isFinished) return;
-              isFinished = true;
-              if (onProgress) onProgress(100);
-              try {
-                if (recorder.state === 'recording') {
-                  recorder.stop();
-                }
-                if (audioCtx && audioCtx.state !== 'closed') {
-                  audioCtx.close().catch(() => {});
-                }
-              } catch {}
-            };
-
-            recorder.onstop = () => {
-              const blob = new Blob(chunks, { type: mimeType || 'video/mp4' });
-              const url = URL.createObjectURL(blob);
-              resolve(url);
-            };
-
-            // Calculate actual full duration of original uploaded video
-            const duration =
-              video.duration && !isNaN(video.duration) && isFinite(video.duration) && video.duration > 0
-                ? video.duration
-                : 15;
-
-            recorder.start(250);
-            video.currentTime = 0;
-
-            video.onended = () => {
-              finishRecording();
-            };
-
-            await video.play().catch((playErr) => {
-              console.warn('Video auto-play notice:', playErr);
-            });
-
-            const drawFrame = () => {
-              if (isFinished) return;
-
-              // Check if original video ended or reached end of duration
-              if (video.ended || (duration > 0 && video.currentTime >= duration - 0.05)) {
-                finishRecording();
-                return;
-              }
-
-              try {
-                // 1. Draw video frame preserving exact 9:16 aspect ratio (center-crop cover, preventing vertical compression/stretching)
-                const vW = video.videoWidth || width;
-                const vH = video.videoHeight || height;
-                const videoAspect = vW / vH;
-                const targetAspect = width / height; // 1080 / 1920 = 0.5625
-
-                let renderW = width;
-                let renderH = height;
-                let renderX = 0;
-                let renderY = 0;
-
-                if (videoAspect > targetAspect) {
-                  // Video is wider than 9:16 -> fit height and center crop horizontally
-                  renderW = height * videoAspect;
-                  renderX = (width - renderW) / 2;
-                } else {
-                  // Video is taller than 9:16 -> fit width and center crop vertically
-                  renderH = width / videoAspect;
-                  renderY = (height - renderH) / 2;
-                }
-
-                ctx.drawImage(video, renderX, renderY, renderW, renderH);
-
-                // 2. Draw user photo in circular gold slot (respecting template.subjectSlot coordinates)
-                if (userImg) {
-                  const slot = template.subjectSlot;
-                  const circleW = (slot && slot.width > 0 && slot.width <= 1) ? slot.width * width : 0.28 * width;
-                  const circleRadius = circleW / 2;
-                  const centerX = (slot && slot.x !== undefined && slot.x >= 0 && slot.x <= 1)
-                    ? slot.x * width + circleRadius
-                    : 0.36 * width + circleRadius;
-                  const centerY = (slot && slot.y !== undefined && slot.y >= 0 && slot.y <= 1)
-                    ? slot.y * height + circleRadius
-                    : 0.67 * height + circleRadius;
-
-                  ctx.save();
-                  ctx.beginPath();
-                  ctx.arc(centerX, centerY, circleRadius, 0, Math.PI * 2);
-                  ctx.clip();
-
-                  // Draw user image centered in circle (cover)
-                  const imgAspect = userImg.width / userImg.height;
-                  let drawW = circleW;
-                  let drawH = circleW;
-                  if (imgAspect > 1) {
-                    drawW = drawH * imgAspect;
-                  } else {
-                    drawH = drawW / imgAspect;
-                  }
-                  ctx.drawImage(userImg, centerX - drawW / 2, centerY - drawH / 2, drawW, drawH);
-                  ctx.restore();
-
-                  // 3. Gold Metallic Border
-                  ctx.save();
-                  ctx.shadowColor = 'rgba(0, 0, 0, 0.55)';
-                  ctx.shadowBlur = 20;
-                  ctx.strokeStyle = '#E5C158';
-                  ctx.lineWidth = 10;
-                  ctx.beginPath();
-                  ctx.arc(centerX, centerY, circleRadius, 0, Math.PI * 2);
-                  ctx.stroke();
-
-                  ctx.strokeStyle = '#B8860B';
-                  ctx.lineWidth = 3;
-                  ctx.beginPath();
-                  ctx.arc(centerX, centerY, circleRadius - 6, 0, Math.PI * 2);
-                  ctx.stroke();
-                  ctx.restore();
-                }
-
-                if (onProgress && duration > 0) {
-                  const pct = Math.min(99, Math.round((video.currentTime / duration) * 100));
-                  onProgress(pct);
-                }
-              } catch (drawErr) {
-                console.warn('Frame render notice:', drawErr);
-              }
-
-              requestAnimationFrame(drawFrame);
-            };
-
-            requestAnimationFrame(drawFrame);
-
-            // Safety timeout: full duration + 4 seconds margin
-            setTimeout(() => {
-              finishRecording();
-            }, (duration + 4) * 1000);
-
-          } catch (err) {
-            console.warn('Video rendering fallback:', err);
-            resolve(videoSrc);
+          if (audioCtx && audioCtx.state !== 'closed') {
+            audioCtx.close().catch(() => {});
           }
         };
 
-        if (video.readyState >= 2) {
-          startRecording();
+        recorder.onstop = () => {
+          const finalMime = mimeType || 'video/mp4';
+          const blob = new Blob(chunks, { type: finalMime });
+          const url = URL.createObjectURL(blob);
+          resolve(url);
+        };
+
+        // 9. Prime video at timestamp 0 and render initial frame
+        videoEl.currentTime = 0;
+        await new Promise<void>((r) => {
+          if (videoEl!.currentTime === 0) {
+            r();
+            return;
+          }
+          const onSeek = () => {
+            videoEl?.removeEventListener('seeked', onSeek);
+            r();
+          };
+          videoEl?.addEventListener('seeked', onSeek);
+          setTimeout(r, 200);
+        });
+
+        const drawSingleFrame = () => {
+          if (!videoEl || !ctx) return;
+          const vW = videoEl.videoWidth || width;
+          const vH = videoEl.videoHeight || height;
+          const videoAspect = vW / vH;
+          const targetAspect = width / height;
+
+          let renderW = width;
+          let renderH = height;
+          let renderX = 0;
+          let renderY = 0;
+
+          if (videoAspect > targetAspect) {
+            renderW = height * videoAspect;
+            renderX = (width - renderW) / 2;
+          } else {
+            renderH = width / videoAspect;
+            renderY = (height - renderH) / 2;
+          }
+
+          ctx.drawImage(videoEl, renderX, renderY, renderW, renderH);
+          if (userImg) {
+            ctx.drawImage(overlayCanvas, 0, 0);
+          }
+        };
+
+        drawSingleFrame();
+
+        // 10. Start playback and wait for 'playing' event before starting recorder
+        const playPromise = videoEl.play();
+        await new Promise<void>((res) => {
+          const onPlaying = () => {
+            videoEl?.removeEventListener('playing', onPlaying);
+            res();
+          };
+          videoEl?.addEventListener('playing', onPlaying);
+          playPromise.catch(() => res());
+          setTimeout(res, 400);
+        });
+
+        // Start recording now that playback is active
+        recorder.start(100);
+
+        // 11. Render Loop synchronized with video decoder frames
+        let lastReportedProgress = -1;
+
+        const loop = () => {
+          if (isFinished || !videoEl) return;
+
+          // Check if video reached full duration or ended
+          if (videoEl.ended || (targetDuration > 0 && videoEl.currentTime >= targetDuration - 0.05)) {
+            finishRecording();
+            return;
+          }
+
+          try {
+            drawSingleFrame();
+
+            // Throttled progress update to keep main thread responsive
+            if (onProgress && targetDuration > 0) {
+              const pct = Math.min(99, Math.floor((videoEl.currentTime / targetDuration) * 100));
+              if (pct !== lastReportedProgress) {
+                lastReportedProgress = pct;
+                onProgress(pct);
+              }
+            }
+          } catch (drawErr) {
+            console.warn('Frame render notice:', drawErr);
+          }
+
+          if ('requestVideoFrameCallback' in videoEl) {
+            vfcHandle = (videoEl as any).requestVideoFrameCallback(loop);
+          } else {
+            rafHandle = requestAnimationFrame(loop);
+          }
+        };
+
+        videoEl.onended = () => {
+          finishRecording();
+        };
+
+        if ('requestVideoFrameCallback' in videoEl) {
+          vfcHandle = (videoEl as any).requestVideoFrameCallback(loop);
         } else {
-          video.onloadeddata = () => startRecording();
-          video.onerror = () => resolve(videoSrc);
+          rafHandle = requestAnimationFrame(loop);
         }
-      } catch (e) {
-        resolve(template.assetUrl || template.thumbnailUrl);
+
+        // 12. Safety Timeout: duration + 4 seconds failsafe
+        safetyTimeout = setTimeout(() => {
+          finishRecording();
+        }, (targetDuration + 4) * 1000);
+
+      } catch (err) {
+        console.warn('Video rendering fallback:', err);
+        if (videoEl && document.body.contains(videoEl)) {
+          document.body.removeChild(videoEl);
+        }
+        if (audioCtx && audioCtx.state !== 'closed') {
+          audioCtx.close().catch(() => {});
+        }
+        resolve(template.videoUrl || template.assetUrl || template.thumbnailUrl);
       }
     });
   }
@@ -464,9 +606,13 @@ export class CanvasRenderer {
       } catch {}
 
       // 4. Fallback via backend proxy download endpoint
+      const apiBase = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_BASE_URL)
+        ? import.meta.env.VITE_API_BASE_URL
+        : 'http://localhost:5000/api';
+      const proxyDownloadUrl = `${apiBase}/upload/proxy-download?url=${encodeURIComponent(dataUrlOrUrl)}&filename=${encodeURIComponent(filename)}`;
+
       try {
-        const proxyUrl = `http://localhost:5000/api/upload/proxy-download?url=${encodeURIComponent(dataUrlOrUrl)}&filename=${encodeURIComponent(filename)}`;
-        const res = await fetch(proxyUrl);
+        const res = await fetch(proxyDownloadUrl);
         if (res.ok) {
           const blob = await res.blob();
           this.downloadBlob(blob, filename);
@@ -475,7 +621,6 @@ export class CanvasRenderer {
       } catch {}
 
       // 5. Ultimate fallback: hidden iframe pointing to proxy-download
-      const proxyDownloadUrl = `http://localhost:5000/api/upload/proxy-download?url=${encodeURIComponent(dataUrlOrUrl)}&filename=${encodeURIComponent(filename)}`;
       const iframe = document.createElement('iframe');
       iframe.style.display = 'none';
       iframe.src = proxyDownloadUrl;

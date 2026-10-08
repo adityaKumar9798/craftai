@@ -71,7 +71,9 @@ export const TemplatePreviewPage: React.FC = () => {
     setDownloading(true);
     setDownloadProgress(currentTemplate.type === 'video' ? 1 : null);
     try {
-      let downloadUrl = currentTemplate.assetUrl || currentTemplate.thumbnailUrl;
+      let downloadUrl = currentTemplate.type === 'video'
+        ? (currentTemplate.videoUrl || currentTemplate.assetUrl)
+        : (currentTemplate.assetUrl || currentTemplate.thumbnailUrl);
 
       if (userPhotoUrl) {
         if (currentTemplate.type === 'video') {
@@ -204,7 +206,7 @@ export const TemplatePreviewPage: React.FC = () => {
         {/* Template Asset (Image or Video) */}
         {currentTemplate.type === 'video' ? (
           <video
-            src={currentTemplate.assetUrl}
+            src={currentTemplate.videoUrl || currentTemplate.assetUrl}
             poster={currentTemplate.thumbnailUrl}
             controls
             autoPlay

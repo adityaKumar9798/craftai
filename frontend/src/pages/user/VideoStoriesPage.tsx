@@ -14,6 +14,8 @@ export const VideoStoriesPage: React.FC = () => {
   const [selectedVideo, setSelectedVideo] = useState<Template | null>(null);
   const [isPlaying, setIsPlaying] = useState<boolean>(true);
   const [shareOpen, setShareOpen] = useState<boolean>(false);
+  const [downloading, setDownloading] = useState<boolean>(false);
+  const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
 
   const videoCategories = [
     { label: 'All', value: 'all' },
@@ -191,9 +193,25 @@ export const VideoStoriesPage: React.FC = () => {
             {/* Controls */}
             <div className="w-full mt-4 flex items-center gap-3">
               <button
+                disabled={downloading}
                 onClick={async () => {
+                  setDownloading(true);
+                  setDownloadProgress(1);
                   try {
-                    const dlUrl = selectedVideo.videoUrl || selectedVideo.assetUrl;
+                    let dlUrl = selectedVideo.videoUrl || selectedVideo.assetUrl;
+                    if (userPhotoUrl) {
+                      try {
+                        dlUrl = await CanvasRenderer.renderVideoWithOverlay(
+                          selectedVideo,
+                          userPhotoUrl,
+                          (pct) => setDownloadProgress(pct)
+                        );
+                      } catch (err) {
+                        console.warn('Personalized video render fallback:', err);
+                        dlUrl = selectedVideo.videoUrl || selectedVideo.assetUrl;
+                      }
+                    }
+
                     const filename = `craft-ai-${selectedVideo.category}-${Date.now()}.mp4`;
                     await CanvasRenderer.downloadDataUrl(dlUrl, filename);
                     await recordDownload({
@@ -210,14 +228,23 @@ export const VideoStoriesPage: React.FC = () => {
                       outputUrl: dlUrl,
                       type: 'video',
                     }).catch(() => {});
-                    alert('Video downloaded successfully! 🎉');
                   } catch (e) {
                     console.warn('Video download error:', e);
+                  } finally {
+                    setDownloading(false);
+                    setDownloadProgress(null);
                   }
                 }}
-                className="flex-1 py-3 rounded-xl brand-gradient text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
+                className={`flex-1 py-3 rounded-xl brand-gradient text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-md ${
+                  downloading ? 'opacity-80 cursor-wait' : 'cursor-pointer hover:opacity-95'
+                }`}
               >
-                <Download className="w-4 h-4" /> Download Video
+                <Download className="w-4 h-4" />
+                {downloading
+                  ? downloadProgress !== null
+                    ? `Processing Video (${downloadProgress}%)...`
+                    : 'Downloading...'
+                  : 'Download Video'}
               </button>
 
               <button
