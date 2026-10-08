@@ -59,10 +59,21 @@ export const ProfilePage: React.FC = () => {
     }
   }, [userPhotoUrl]);
 
+  const isGuest = Boolean(
+    user?.uid?.startsWith('guest_') ||
+    user?.email?.toLowerCase().includes('@craftai.app') ||
+    user?.email?.toLowerCase().startsWith('guest')
+  );
+
   const handleStartEdit = () => {
     setEditFirstName(user?.firstName || user?.name?.split(' ')[0] || '');
     setEditLastName(user?.lastName || user?.name?.split(' ').slice(1).join(' ') || '');
-    setEditUsername(user?.username?.replace(/^@/, '') || user?.email?.split('@')[0] || '');
+    setEditUsername(
+      user?.username?.replace(/^@/, '') ||
+      (user?.name ? user.name.toLowerCase().replace(/\s+/g, '_') : '') ||
+      (!isGuest && user?.email ? user.email.split('@')[0] : '') ||
+      ''
+    );
     setEditReligion(user?.religion || 'hindu');
     setIsEditing(true);
   };
@@ -115,7 +126,10 @@ export const ProfilePage: React.FC = () => {
   };
 
   const handleCopyHandle = () => {
-    const handleText = user?.username || `@${user?.email?.split('@')[0] || 'user'}`;
+    const handleText =
+      user?.username ||
+      (user?.name ? `@${user.name.toLowerCase().replace(/\s+/g, '_')}` : '') ||
+      (!isGuest && user?.email ? `@${user.email.split('@')[0]}` : '@user');
     navigator.clipboard?.writeText(handleText);
     setCopiedHandle(true);
     setTimeout(() => setCopiedHandle(false), 2000);
@@ -279,7 +293,7 @@ export const ProfilePage: React.FC = () => {
             {/* Name + Verified */}
             <div className="flex items-center justify-center gap-1.5 mb-0.5">
               <h1 className="text-lg font-bold text-gray-900 tracking-tight">
-                {user?.name || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'KingAditya Kumar'}
+                {user?.name || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'User'}
               </h1>
               <CheckCircle2 className="w-4 h-4 text-blue-500 fill-blue-50" />
             </div>
@@ -290,17 +304,25 @@ export const ProfilePage: React.FC = () => {
                 onClick={handleCopyHandle}
                 className="inline-flex items-center gap-1 font-medium text-purple-600 hover:text-purple-700 transition"
               >
-                <span>{user?.username || `@${user?.email?.split('@')[0] || 'kingadityak7'}`}</span>
+                <span>
+                  {user?.username ||
+                    (user?.name ? `@${user.name.toLowerCase().replace(/\s+/g, '_')}` : '') ||
+                    (!isGuest && user?.email ? `@${user.email.split('@')[0]}` : '@user')}
+                </span>
                 {copiedHandle ? (
                   <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-1 rounded">Copied!</span>
                 ) : (
                   <Copy className="w-3 h-3 text-gray-400" />
                 )}
               </button>
-              <span>•</span>
-              <span className="truncate max-w-[170px] text-gray-400 font-normal">
-                {user?.email || 'kingadityak7@gmail.com'}
-              </span>
+              {!isGuest && user?.email && (
+                <>
+                  <span>•</span>
+                  <span className="truncate max-w-[170px] text-gray-400 font-normal">
+                    {user.email}
+                  </span>
+                </>
+              )}
             </div>
 
             {/* Badges: Community + Plan */}

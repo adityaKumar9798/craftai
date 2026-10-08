@@ -542,27 +542,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const createGuestAccount = async (firstName: string, lastName: string): Promise<UserProfile> => {
     let guestNumber = 1;
 
-    // Check Firebase for synced guest counter across sessions
+    // 1. Fetch next sequential number from backend API (synchronized across all browsers/devices)
+    try {
+      const res = await fetch('/api/users/guest-counter/next');
+      if (res.ok) {
+        const json = await res.json();
+        if (json && typeof json.guestNumber === 'number' && json.guestNumber > 0) {
+          guestNumber = json.guestNumber;
+        }
+      }
+    } catch {}
+
+    // 2. Check & sync with Firebase Firestore system_counters
     if (db) {
       try {
         const counterRef = doc(db, 'system_counters', 'guest_users');
         const counterSnap = await getDoc(counterRef);
         if (counterSnap.exists()) {
-          guestNumber = (counterSnap.data()?.count || 0) + 1;
+          const fsCount = counterSnap.data()?.count || 0;
+          guestNumber = Math.max(guestNumber, fsCount + 1);
         } else {
           const currentCount = parseInt(localStorage.getItem('craft_ai_guest_counter') || '0', 10);
-          guestNumber = Math.max(currentCount + 1, 1);
+          guestNumber = Math.max(guestNumber, currentCount + 1, 1);
         }
         await setDoc(counterRef, { count: guestNumber, lastUpdated: new Date().toISOString() }, { merge: true });
       } catch (err) {
-        console.warn('[Firestore Counter] Using local counter:', err);
+        console.warn('[Firestore Counter] Direct sync note:', err);
         const currentCount = parseInt(localStorage.getItem('craft_ai_guest_counter') || '0', 10);
-        guestNumber = currentCount + 1;
+        guestNumber = Math.max(guestNumber, currentCount + 1);
       }
     } else {
       const currentCount = parseInt(localStorage.getItem('craft_ai_guest_counter') || '0', 10);
-      guestNumber = currentCount + 1;
+      guestNumber = Math.max(guestNumber, currentCount + 1);
     }
+
     localStorage.setItem('craft_ai_guest_counter', String(guestNumber));
 
     const fName = firstName.trim();
@@ -589,6 +602,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       createdAt: new Date().toISOString(),
       lastLoginAt: new Date().toISOString(),
     };
+
+    // Ensure completely fresh isolated cache for new user
+    localStorage.removeItem(`craft_ai_creations_${guestUid}`);
+    localStorage.removeItem(`craft_ai_favorites_${guestUid}`);
+    localStorage.removeItem(`craft_ai_downloads_${guestUid}`);
 
     // Save to Firebase Firestore
     if (db) {

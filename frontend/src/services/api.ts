@@ -4,9 +4,18 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
 export class ApiService {
   private static getHeaders(token?: string) {
+    let uid = '';
+    try {
+      const savedUser = localStorage.getItem('craft_ai_user');
+      if (savedUser) {
+        uid = JSON.parse(savedUser)?.uid || '';
+      }
+    } catch {}
+
     return {
       'Content-Type': 'application/json',
       ...(token && { Authorization: `Bearer ${token}` }),
+      ...(uid && { 'x-user-id': uid }),
     };
   }
 

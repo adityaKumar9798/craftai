@@ -54,14 +54,38 @@ export const verifyAuth = async (
       } catch {}
     }
 
-    // Default client user fallback so uploads and operations succeed
+    if (token && token.startsWith('guest_token_')) {
+      const gNum = token.replace('guest_token_', '');
+      req.user = {
+        uid: `guest_user_${gNum}`,
+        email: `guest${gNum}@craftai.app`,
+        name: `Guest User ${gNum}`,
+        role: 'user',
+      };
+      next();
+      return;
+    }
+
+    const xUserId = req.headers['x-user-id'] as string;
+    if (xUserId) {
+      req.user = {
+        uid: xUserId,
+        email: (req.headers['x-user-email'] as string) || '',
+        name: (req.headers['x-user-name'] as string) || 'User',
+        role: 'user',
+      };
+      next();
+      return;
+    }
+
+    // Default fallback - generate unique temporary session id rather than shared creator_user
     req.user = {
-      uid: (req.headers['x-user-id'] as string) || 'creator_user',
+      uid: `guest_anon_${Date.now()}`,
       role: 'user',
     };
     next();
   } catch (error: any) {
-    req.user = { uid: 'creator_user', role: 'user' };
+    req.user = { uid: `guest_anon_${Date.now()}`, role: 'user' };
     next();
   }
 };

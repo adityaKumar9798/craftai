@@ -159,7 +159,7 @@ export const CreativesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     // Also fetch from backend API if available
     if (token) {
       ApiService.getUserCreatives(token).then((data) => {
-        if (data && Array.isArray(data) && data.length > 0) {
+        if (data && Array.isArray(data)) {
           setCreations(data);
           localStorage.setItem(`craft_ai_creations_${uid}`, JSON.stringify(data));
         }

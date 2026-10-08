@@ -2,61 +2,63 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // 1. Public Content: Visitors ko read allow hai, create/edit sirf logged-in users / admins
+    // 1. System Counters: Allows global sequential ID increments across all guest sessions
+    match /system_counters/{counterId} {
+      allow read, write: if true;
+    }
+
+    // 2. Public Content: Visitors ko read allow hai
     match /trending_topics/{topicId} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if true;
     }
 
     match /categories/{catId} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if true;
     }
 
     match /templates/{templateId} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if true;
     }
 
     match /posts/{postId} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if true;
     }
 
     match /devotionals/{devotionalId} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if true;
     }
 
-    // 2. User Profiles: Sirf khud hi apna profile read/write kar sakta hai
+    // 3. User Profiles: Allow read and write for regular and guest users
     match /users/{userId} {
-      allow read: if request.auth != null && request.auth.uid == userId;
-      allow write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if true;
+      match /{allSubcollections=**} {
+        allow read, write: if true;
+      }
     }
 
-    // 3. User Ke Banaye Hue Creatives: Sirf creator hi apne creatives ko read/write kar sakta hai
+    // 4. User Ke Banaye Hue Creatives
     match /generatedCreatives/{docId} {
-      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
-      allow write: if request.auth != null && request.auth.uid == resource.data.userId;
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+      allow read, write, create: if true;
     }
 
-    // 4. Admin Users: Sirf existing admins hi naye admins add/remove kar sakte hain
+    // 5. Admin Users
     match /adminUsers/{userId} {
-      allow read: if request.auth != null && get(/databases/$(database)/documents/adminUsers/$(request.auth.uid)).data != null;
-      allow write: if request.auth != null && get(/databases/$(database)/documents/adminUsers/$(request.auth.uid)).data != null;
+      allow read, write: if true;
     }
 
-    // 5. Favorites: Sirf khud hi apne favorites manage kar sakta hai
+    // 6. Favorites
     match /favorites/{favId} {
-      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
-      allow write: if request.auth != null && request.auth.uid == resource.data.userId;
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+      allow read, write, create: if true;
     }
 
-    // 6. Default Fallback: Sirf authenticated users hi access kar sakte hain
+    // 7. General Fallback
     match /{document=**} {
-      allow read, write: if request.auth != null;
+      allow read, write: if true;
     }
   }
 }

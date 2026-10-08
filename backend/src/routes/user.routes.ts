@@ -8,6 +8,7 @@ router.get('/profile', verifyAuth, UserController.getProfile);
 router.patch('/profile', verifyAuth, UserController.updateProfile);
 router.post('/favorites/toggle', verifyAuth, UserController.toggleFavorite);
 router.get('/favorites', verifyAuth, UserController.getFavorites);
+router.get('/guest-counter/next', UserController.getNextGuestNumber);
 router.post('/sync', UserController.syncUser);
 router.get('/list', UserController.listUsers);
 router.post('/role', UserController.toggleRole);

@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { Logo } from '../common/Logo';
 import { useAuth } from '../../contexts/AuthContext';
+import { ADMIN_BASE_PATH } from '../../constants/routes';
 
 interface MobileLayoutProps {
   children: React.ReactNode;
@@ -38,7 +39,7 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const isAdminPage = location.pathname.startsWith('/admin');
+  const isAdminPage = location.pathname.startsWith('/admin') || location.pathname.startsWith(ADMIN_BASE_PATH);
 
   const { userPhotoUrl, user, logout, isAdmin } = useAuth();
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -61,15 +62,15 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
   }, [drawerOpen]);
 
   const adminNavItems = [
-    { label: 'Create Template', path: '/admin', icon: FileText, modalEvent: 'openAddTemplateModal' },
-    { label: 'Create Post', path: '/admin/posts', icon: ImageIcon, modalEvent: 'openAddPostModal' },
-    { label: 'Create Devotional', path: '/admin', icon: Sparkles, modalEvent: 'openAddDevotionalModal' },
-    { label: 'Trending Topics', path: '/admin/trending-topics', icon: Flame },
-    { label: 'Manage Posts', path: '/admin/posts', icon: ImageIcon },
-    { label: 'Templates', path: '/admin/templates', icon: FileText },
-    { label: 'Downloads & Stats', path: '/admin/downloads', icon: Download },
-    { label: 'Users', path: '/admin/users', icon: Users },
-    { label: 'Categories', path: '/admin/categories', icon: Grid },
+    { label: 'Create Template', path: ADMIN_BASE_PATH, icon: FileText, modalEvent: 'openAddTemplateModal' },
+    { label: 'Create Post', path: `${ADMIN_BASE_PATH}/posts`, icon: ImageIcon, modalEvent: 'openAddPostModal' },
+    { label: 'Create Devotional', path: ADMIN_BASE_PATH, icon: Sparkles, modalEvent: 'openAddDevotionalModal' },
+    { label: 'Trending Topics', path: `${ADMIN_BASE_PATH}/trending-topics`, icon: Flame },
+    { label: 'Manage Posts', path: `${ADMIN_BASE_PATH}/posts`, icon: ImageIcon },
+    { label: 'Templates', path: `${ADMIN_BASE_PATH}/templates`, icon: FileText },
+    { label: 'Downloads & Stats', path: `${ADMIN_BASE_PATH}/downloads`, icon: Download },
+    { label: 'Users', path: `${ADMIN_BASE_PATH}/users`, icon: Users },
+    { label: 'Categories', path: `${ADMIN_BASE_PATH}/categories`, icon: Grid },
   ];
 
   const userNavItems = [
@@ -123,7 +124,7 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
             {isAdminPage ? (
               <>
                 <button
-                  onClick={() => navigate('/admin/trending-topics')}
+                  onClick={() => navigate(`${ADMIN_BASE_PATH}/trending-topics`)}
                   className="relative flex h-9 w-9 items-center justify-center rounded-full text-gray-700 bg-gray-100/70 hover:bg-gray-200 transition"
                   title="Trending Topics"
                 >
@@ -223,7 +224,7 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
                 const Icon = item.icon;
                 const isActive =
                   location.pathname === item.path ||
-                  (item.path !== '/admin' && location.pathname.startsWith(item.path));
+                  (item.path !== '/admin' && item.path !== ADMIN_BASE_PATH && location.pathname.startsWith(item.path));
                 return (
                   <button
                     key={item.label}
@@ -305,7 +306,7 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
                   <button
                     onClick={() => {
                       setDrawerOpen(false);
-                      navigate('/admin');
+                      navigate(ADMIN_BASE_PATH);
                     }}
                     className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 transition"
                   >
@@ -377,7 +378,7 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
         {isAdminPage ? (
           <>
             <NavLink
-              to="/admin"
+              to={ADMIN_BASE_PATH}
               end
               className={({ isActive }) =>
                 `flex flex-col items-center gap-0.5 text-[10px] font-medium transition ${
@@ -390,7 +391,7 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
             </NavLink>
 
             <NavLink
-              to="/admin/posts"
+              to={`${ADMIN_BASE_PATH}/posts`}
               className={({ isActive }) =>
                 `flex flex-col items-center gap-0.5 text-[10px] font-medium transition ${
                   isActive ? 'text-purple-600 font-bold' : 'text-gray-400 hover:text-gray-600'
@@ -413,7 +414,7 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
             </div>
 
             <NavLink
-              to="/admin/trending-topics"
+              to={`${ADMIN_BASE_PATH}/trending-topics`}
               className={({ isActive }) =>
                 `flex flex-col items-center gap-0.5 text-[10px] font-medium transition ${
                   isActive ? 'text-purple-600 font-bold' : 'text-gray-400 hover:text-gray-600'
@@ -425,7 +426,7 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
             </NavLink>
 
             <NavLink
-              to="/admin/users"
+              to={`${ADMIN_BASE_PATH}/users`}
               className={({ isActive }) =>
                 `flex flex-col items-center gap-0.5 text-[10px] font-medium transition ${
                   isActive ? 'text-purple-600 font-bold' : 'text-gray-400 hover:text-gray-600'

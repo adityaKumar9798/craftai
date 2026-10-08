@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { Logo } from '../common/Logo';
 import { useAuth } from '../../contexts/AuthContext';
+import { ADMIN_BASE_PATH } from '../../constants/routes';
 
 interface DesktopLayoutProps {
   children: React.ReactNode;
@@ -46,19 +47,24 @@ export const DesktopLayout: React.FC<DesktopLayoutProps> = ({ children }) => {
     }
   };
 
-  const isAdminPage = location.pathname.startsWith('/admin');
+  const isAdminPage = location.pathname.startsWith('/admin') || location.pathname.startsWith(ADMIN_BASE_PATH);
+  const isGuest = Boolean(
+    user?.uid?.startsWith('guest_') ||
+    user?.email?.toLowerCase().includes('@craftai.app') ||
+    user?.email?.toLowerCase().startsWith('guest')
+  );
 
   const navItems = isAdminPage
     ? [
-        { label: 'Create Template', path: '/admin', icon: FileText },
-        { label: 'Create Post', path: '/admin/create-post', icon: ImageIcon },
-        { label: 'Create Devotional', path: '/admin/create-devotional', icon: Sparkles },
-        { label: 'Trending Topics', path: '/admin/trending-topics', icon: Flame },
-        { label: 'Manage Posts', path: '/admin/posts', icon: ImageIcon },
-        { label: 'Templates', path: '/admin/templates', icon: FileText },
-        { label: 'Downloads & Stats', path: '/admin/downloads', icon: Download },
-        { label: 'Users', path: '/admin/users', icon: Users },
-        { label: 'Categories', path: '/admin/categories', icon: Grid },
+        { label: 'Create Template', path: ADMIN_BASE_PATH, icon: FileText },
+        { label: 'Create Post', path: `${ADMIN_BASE_PATH}/create-post`, icon: ImageIcon },
+        { label: 'Create Devotional', path: `${ADMIN_BASE_PATH}/create-devotional`, icon: Sparkles },
+        { label: 'Trending Topics', path: `${ADMIN_BASE_PATH}/trending-topics`, icon: Flame },
+        { label: 'Manage Posts', path: `${ADMIN_BASE_PATH}/posts`, icon: ImageIcon },
+        { label: 'Templates', path: `${ADMIN_BASE_PATH}/templates`, icon: FileText },
+        { label: 'Downloads & Stats', path: `${ADMIN_BASE_PATH}/downloads`, icon: Download },
+        { label: 'Users', path: `${ADMIN_BASE_PATH}/users`, icon: Users },
+        { label: 'Categories', path: `${ADMIN_BASE_PATH}/categories`, icon: Grid },
       ]
     : [
         { label: 'Home', path: '/home', icon: Home },
@@ -90,23 +96,23 @@ export const DesktopLayout: React.FC<DesktopLayoutProps> = ({ children }) => {
         <nav className="flex-1 px-4 space-y-1.5 overflow-y-auto">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive = location.pathname === item.path || (item.path !== '/home' && item.path !== '/admin' && location.pathname.startsWith(item.path));
+            const isActive = location.pathname === item.path || (item.path !== '/home' && item.path !== '/admin' && item.path !== ADMIN_BASE_PATH && location.pathname.startsWith(item.path));
             return (
               <NavLink
                 key={item.path}
                 to={item.path}
                 onClick={(e) => {
-                  if (item.label === 'Create Template' && location.pathname.startsWith('/admin')) {
+                  if (item.label === 'Create Template' && (location.pathname.startsWith('/admin') || location.pathname.startsWith(ADMIN_BASE_PATH))) {
                     e.preventDefault();
                     window.dispatchEvent(new Event('openAddTemplateModal'));
-                  } else if (item.label === 'Create Post' && location.pathname.startsWith('/admin')) {
+                  } else if (item.label === 'Create Post' && (location.pathname.startsWith('/admin') || location.pathname.startsWith(ADMIN_BASE_PATH))) {
                     e.preventDefault();
                     window.dispatchEvent(new Event('openAddPostModal'));
-                  } else if (item.label === 'Create Devotional' && location.pathname.startsWith('/admin')) {
+                  } else if (item.label === 'Create Devotional' && (location.pathname.startsWith('/admin') || location.pathname.startsWith(ADMIN_BASE_PATH))) {
                     e.preventDefault();
                     window.dispatchEvent(new Event('openAddDevotionalModal'));
                   } else if (item.label === 'Trending Topics') {
-                    // Navigate directly to dedicated /admin/trending-topics page
+                    // Navigate directly to dedicated trending topics page
                   }
                 }}
                 className={`flex items-center gap-3.5 px-4 py-3 rounded-2xl text-sm font-semibold transition-all duration-200 ${
@@ -243,8 +249,10 @@ export const DesktopLayout: React.FC<DesktopLayoutProps> = ({ children }) => {
               {userDropdownOpen && (
                 <div className="absolute right-0 mt-2 w-56 rounded-2xl bg-white p-2 shadow-xl border border-gray-100 z-50 animate-in fade-in slide-in-from-top-2">
                   <div className="px-3 py-2 border-b border-gray-100">
-                    <p className="text-xs font-bold text-gray-900">{user?.name || user?.email?.split('@')[0] || 'User'}</p>
-                    <p className="text-[11px] text-gray-500 truncate">{user?.email || ''}</p>
+                    <p className="text-xs font-bold text-gray-900">{user?.name || (!isGuest && user?.email?.split('@')[0]) || 'User'}</p>
+                    {!isGuest && user?.email && (
+                      <p className="text-[11px] text-gray-500 truncate">{user.email}</p>
+                    )}
                     <span className="inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-purple-100 text-purple-700">
                       {user?.plan || 'Free User'}
                     </span>
@@ -273,7 +281,7 @@ export const DesktopLayout: React.FC<DesktopLayoutProps> = ({ children }) => {
                       <button
                         onClick={() => {
                           setUserDropdownOpen(false);
-                          navigate('/admin');
+                          navigate(ADMIN_BASE_PATH);
                         }}
                         className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-purple-700 hover:bg-purple-50 rounded-xl transition"
                       >

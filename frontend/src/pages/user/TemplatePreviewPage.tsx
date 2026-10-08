@@ -200,7 +200,7 @@ export const TemplatePreviewPage: React.FC = () => {
       </div>
 
       {/* Main Template Card Preview (Full bleed edge-to-edge) */}
-      <div className="relative w-full aspect-[3/4] sm:aspect-[9/16] rounded-2xl sm:rounded-[24px] overflow-hidden shadow-sm border border-gray-100 bg-gray-900 mx-auto">
+      <div className={`relative w-full ${currentTemplate.type === 'video' ? 'aspect-[9/16] max-w-sm' : (isPostFormat ? 'aspect-[3/4] max-w-md' : 'aspect-[9/16] max-w-sm')} rounded-2xl sm:rounded-[24px] overflow-hidden shadow-sm border border-gray-100 bg-gray-900 mx-auto`}>
         {/* Template Asset (Image or Video) */}
         {currentTemplate.type === 'video' ? (
           <video
@@ -227,9 +227,9 @@ export const TemplatePreviewPage: React.FC = () => {
         <div
           className="absolute overflow-hidden rounded-full aspect-square border-[3px] border-[#E5C158] ring-2 ring-[#B8860B]/70 shadow-[0_6px_24px_rgba(0,0,0,0.65),inset_0_2px_4px_rgba(255,255,255,0.4)] pointer-events-none z-10"
           style={{
-            left: '36%',
-            top: isPostFormat ? '64%' : '67%',
-            width: '28%',
+            left: currentTemplate.subjectSlot?.x !== undefined ? `${currentTemplate.subjectSlot.x * 100}%` : '36%',
+            top: currentTemplate.subjectSlot?.y !== undefined ? `${currentTemplate.subjectSlot.y * 100}%` : (currentTemplate.type === 'video' ? '67%' : (isPostFormat ? '64%' : '67%')),
+            width: currentTemplate.subjectSlot?.width !== undefined ? `${currentTemplate.subjectSlot.width * 100}%` : '28%',
             transform: currentTemplate.subjectSlot?.rotation
               ? `rotate(${currentTemplate.subjectSlot.rotation}deg)`
               : undefined,

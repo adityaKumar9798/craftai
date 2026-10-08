@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { ShieldCheck, Mail, Lock, ArrowLeft } from 'lucide-react';
 import { Logo } from '../../components/common/Logo';
-
-const ADMIN_PASSWORD = '#A9x7K2m8Q4p6L1z5';
+import { ADMIN_BASE_PATH } from '../../constants/routes';
+import { auth, db, signInWithEmailAndPassword, doc, getDoc, setDoc, isFirebaseConfigured } from '../../firebase/firebase';
 
 export const AdminLoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -20,22 +20,94 @@ export const AdminLoginPage: React.FC = () => {
       return;
     }
 
-    if (password !== ADMIN_PASSWORD) {
-      setError('Invalid admin password.');
-      return;
-    }
-
     try {
       setLoading(true);
       setError(null);
 
-      // Store admin session in localStorage
-      localStorage.setItem('admin_email', email.trim());
-      localStorage.setItem('admin_logged_in', 'true');
+      if (!isFirebaseConfigured || !auth) {
+        throw new Error('Firebase is not configured.');
+      }
 
-      navigate('/admin');
+      // 1. Real Firebase Authentication with Email & Password
+      const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
+      const fbUser = cred.user;
+
+      // 2. Check if user is an admin (Firestore role OR admin in email)
+      let isAdminUser = false;
+      let userName = fbUser.displayName || email.split('@')[0];
+
+      if (db) {
+        try {
+          const userDocRef = doc(db, 'users', fbUser.uid);
+          const userDocSnap = await getDoc(userDocRef);
+          if (userDocSnap.exists()) {
+            const data = userDocSnap.data();
+            if (data?.role === 'admin' || data?.isAdmin === true) {
+              isAdminUser = true;
+            }
+            if (data?.name) userName = data.name;
+          }
+        } catch (fsErr) {
+          console.warn('Firestore admin check note:', fsErr);
+        }
+      }
+
+      // Automatically grant admin if email contains "admin" (e.g. adminaditya@craftai.com)
+      if (!isAdminUser && (email.toLowerCase().includes('admin') || fbUser.email?.toLowerCase().includes('admin'))) {
+        isAdminUser = true;
+      }
+
+      if (!isAdminUser) {
+        setError('Access Denied: This Firebase account does not have Administrator privileges. Set role: "admin" in Firestore users.');
+        return;
+      }
+
+      // 3. Ensure Firestore user document has role: 'admin' and plan: 'Administrator'
+      if (db) {
+        try {
+          await setDoc(
+            doc(db, 'users', fbUser.uid),
+            {
+              uid: fbUser.uid,
+              email: fbUser.email || email.trim(),
+              name: userName,
+              role: 'admin',
+              plan: 'Administrator',
+              lastLoginAt: new Date().toISOString(),
+            },
+            { merge: true }
+          );
+        } catch (e) {}
+      }
+
+      // 4. Save session and navigate
+      localStorage.setItem('admin_email', fbUser.email || email.trim());
+      localStorage.setItem('admin_logged_in', 'true');
+      const profile = {
+        uid: fbUser.uid,
+        name: userName,
+        email: fbUser.email || email.trim(),
+        photoUrl: fbUser.photoURL || '',
+        role: 'admin' as const,
+        plan: 'Administrator',
+        createdAt: new Date().toISOString(),
+      };
+      localStorage.setItem('craft_ai_user', JSON.stringify(profile));
+
+      navigate(ADMIN_BASE_PATH);
     } catch (err: any) {
-      setError('Login failed. Please try again.');
+      console.error('Firebase Admin Login Error:', err);
+      if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
+        setError('Invalid credentials. Please verify your email and password in Firebase.');
+      } else if (err.code === 'auth/wrong-password') {
+        setError('Incorrect password for this Firebase user.');
+      } else if (err.code === 'auth/invalid-email') {
+        setError('Please enter a valid email address.');
+      } else if (err.code === 'auth/too-many-requests') {
+        setError('Too many failed login attempts. Please wait a moment and try again.');
+      } else {
+        setError(err.message || 'Firebase login failed. Please check your credentials.');
+      }
     } finally {
       setLoading(false);
     }

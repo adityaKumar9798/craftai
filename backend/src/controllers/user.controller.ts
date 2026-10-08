@@ -1,8 +1,11 @@
 import { Response } from 'express';
+import fs from 'fs';
+import path from 'path';
 import { AuthenticatedRequest } from '../middleware/auth.js';
 import { db, isFirebaseConfigured } from '../config/firebase.js';
 
 let inMemoryFavorites: { id: string; userId: string; templateId: string }[] = [];
+let inMemoryGuestCounter = 0;
 
 export class UserController {
   static async getProfile(req: AuthenticatedRequest, res: Response): Promise<void> {
@@ -250,12 +253,70 @@ export class UserController {
             deletedCount++;
           }
         }
-        res.status(200).json({ success: true, message: `Purged ${deletedCount} fake user documents from database` });
+        res.status(200).json({ success: true, message: `Purged ${deletedCount} fake user documents` });
         return;
       }
       res.status(200).json({ success: true, message: 'Database not configured' });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error?.message });
+    }
+  }
+
+  static async getNextGuestNumber(req: any, res: Response): Promise<void> {
+    try {
+      let nextNumber = 1;
+
+      // 1. If Firebase Admin SDK is available, sync with Firestore system counter
+      if (isFirebaseConfigured && db) {
+        try {
+          const counterRef = db.collection('system_counters').doc('guest_users');
+          const docSnap = await counterRef.get();
+          if (docSnap.exists) {
+            nextNumber = (Number(docSnap.data()?.count) || 0) + 1;
+          } else {
+            const userSnap = await db.collection('users')
+              .where('uid', '>=', 'guest_user_')
+              .where('uid', '<=', 'guest_user_\uf8ff')
+              .get();
+            nextNumber = userSnap.size + 1;
+          }
+          await counterRef.set({ count: nextNumber, lastUpdated: new Date().toISOString() }, { merge: true });
+          res.status(200).json({ success: true, guestNumber: nextNumber });
+          return;
+        } catch (fbErr) {
+          console.warn('[Firebase Counter] Firestore error, using persistent store:', fbErr);
+        }
+      }
+
+      // 2. Persistent file store
+      try {
+        const dataDir = path.resolve(process.cwd(), 'data');
+        if (!fs.existsSync(dataDir)) {
+          fs.mkdirSync(dataDir, { recursive: true });
+        }
+        const counterFile = path.join(dataDir, 'counters.json');
+        let current = 0;
+        if (fs.existsSync(counterFile)) {
+          try {
+            const raw = JSON.parse(fs.readFileSync(counterFile, 'utf-8'));
+            current = Number(raw.guestUsersCount) || 0;
+          } catch {}
+        }
+        nextNumber = Math.max(current, inMemoryGuestCounter) + 1;
+        inMemoryGuestCounter = nextNumber;
+        fs.writeFileSync(
+          counterFile,
+          JSON.stringify({ guestUsersCount: nextNumber, lastUpdated: new Date().toISOString() }, null, 2)
+        );
+      } catch {
+        inMemoryGuestCounter += 1;
+        nextNumber = inMemoryGuestCounter;
+      }
+
+      res.status(200).json({ success: true, guestNumber: nextNumber });
+    } catch (error: any) {
+      inMemoryGuestCounter += 1;
+      res.status(200).json({ success: true, guestNumber: inMemoryGuestCounter });
     }
   }
 }

@@ -1,9 +1,10 @@
-import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { CreativesProvider } from './contexts/CreativesContext';
 import { ResponsiveLayout } from './components/layout/ResponsiveLayout';
 import { useAuth } from './contexts/AuthContext';
+import { ADMIN_BASE_PATH, ADMIN_LOGIN_PATH, ADMIN_HASH_KEY } from './constants/routes';
 
 // Public Pages
 import { SplashPage } from './pages/public/SplashPage';
@@ -47,10 +48,26 @@ const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 
 /** Redirects non-admins away; also requires login */
 const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const isAdminLoggedIn = localStorage.getItem('admin_logged_in') === 'true';
+  const { user, isAdmin } = useAuth();
+  const isAdminLoggedIn = localStorage.getItem('admin_logged_in') === 'true' || isAdmin || user?.role === 'admin';
 
-  if (!isAdminLoggedIn) return <Navigate to="/admin/login" replace />;
+  if (!isAdminLoggedIn) return <Navigate to={ADMIN_LOGIN_PATH} replace />;
   return <>{children}</>;
+};
+
+/** Handles hash-based admin trigger (#A9x7K2m8Q4p6L1z5-admin) */
+const HashRouteHandler: React.FC = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash === ADMIN_HASH_KEY || hash.toLowerCase() === ADMIN_HASH_KEY.toLowerCase()) {
+      navigate(ADMIN_BASE_PATH, { replace: true });
+    }
+  }, [location, navigate]);
+
+  return null;
 };
 
 // ─── App ─────────────────────────────────────────────────────────────────────
@@ -58,6 +75,7 @@ const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 export const App: React.FC = () => {
   return (
     <BrowserRouter>
+      <HashRouteHandler />
       <AuthProvider>
         <CreativesProvider>
           <Routes>
@@ -132,13 +150,18 @@ export const App: React.FC = () => {
               </PrivateRoute>
             } />
 
-            {/* ── ADMIN ROUTES ───────────────────────────────────────── */}
-            <Route path="/admin/login" element={<AdminLoginPage />} />
-            <Route path="/admin/*" element={
+            {/* ── SECRET ADMIN ROUTES (#A9x7K2m8Q4p6L1z5-admin) ─────── */}
+            <Route path={ADMIN_LOGIN_PATH} element={<AdminLoginPage />} />
+            <Route path={`${ADMIN_BASE_PATH}/*`} element={
               <AdminRoute>
                 <ResponsiveLayout><AdminDashboard /></ResponsiveLayout>
               </AdminRoute>
             } />
+
+            {/* Legacy aliases redirecting to secret admin portal */}
+            <Route path="/admin/login" element={<Navigate to={ADMIN_LOGIN_PATH} replace />} />
+            <Route path="/admin/*" element={<Navigate to={ADMIN_BASE_PATH} replace />} />
+            <Route path="/admin" element={<Navigate to={ADMIN_BASE_PATH} replace />} />
 
             {/* ── FALLBACK ───────────────────────────────────────────── */}
             <Route path="*" element={<Navigate to="/" replace />} />

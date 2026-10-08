@@ -192,9 +192,9 @@ export class CanvasRenderer {
           }
         }
 
-        const isPostFormat = template.format === 'post';
+        // Videos are strictly rendered in 9:16 standard Full HD (1080 x 1920)
         const width = 1080;
-        const height = isPostFormat ? 1440 : 1920;
+        const height = 1920;
 
         const startRecording = async () => {
           try {
@@ -321,22 +321,47 @@ export class CanvasRenderer {
               }
 
               try {
-                // 1. Draw video frame
-                ctx.drawImage(video, 0, 0, width, height);
+                // 1. Draw video frame preserving exact 9:16 aspect ratio (center-crop cover, preventing vertical compression/stretching)
+                const vW = video.videoWidth || width;
+                const vH = video.videoHeight || height;
+                const videoAspect = vW / vH;
+                const targetAspect = width / height; // 1080 / 1920 = 0.5625
 
-                // 2. Draw user photo in circular gold slot
+                let renderW = width;
+                let renderH = height;
+                let renderX = 0;
+                let renderY = 0;
+
+                if (videoAspect > targetAspect) {
+                  // Video is wider than 9:16 -> fit height and center crop horizontally
+                  renderW = height * videoAspect;
+                  renderX = (width - renderW) / 2;
+                } else {
+                  // Video is taller than 9:16 -> fit width and center crop vertically
+                  renderH = width / videoAspect;
+                  renderY = (height - renderH) / 2;
+                }
+
+                ctx.drawImage(video, renderX, renderY, renderW, renderH);
+
+                // 2. Draw user photo in circular gold slot (respecting template.subjectSlot coordinates)
                 if (userImg) {
-                  const circleW = 0.28 * width;
+                  const slot = template.subjectSlot;
+                  const circleW = (slot && slot.width > 0 && slot.width <= 1) ? slot.width * width : 0.28 * width;
                   const circleRadius = circleW / 2;
-                  const centerX = 0.36 * width + circleRadius;
-                  const centerY = (isPostFormat ? 0.64 : 0.67) * height + circleRadius;
+                  const centerX = (slot && slot.x !== undefined && slot.x >= 0 && slot.x <= 1)
+                    ? slot.x * width + circleRadius
+                    : 0.36 * width + circleRadius;
+                  const centerY = (slot && slot.y !== undefined && slot.y >= 0 && slot.y <= 1)
+                    ? slot.y * height + circleRadius
+                    : 0.67 * height + circleRadius;
 
                   ctx.save();
                   ctx.beginPath();
                   ctx.arc(centerX, centerY, circleRadius, 0, Math.PI * 2);
                   ctx.clip();
 
-                  // Draw user image centered in circle
+                  // Draw user image centered in circle (cover)
                   const imgAspect = userImg.width / userImg.height;
                   let drawW = circleW;
                   let drawH = circleW;

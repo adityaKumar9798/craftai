@@ -39,6 +39,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Template, UserProfile, Category, TrendingTopic } from '../../types';
 import { realtimeStore, LiveActivityEvent, PlatformMetrics, DownloadRecord } from '../../services/realtimeStore';
 import { ApiService } from '../../services/api';
+import { ADMIN_BASE_PATH } from '../../constants/routes';
 
 export const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -59,7 +60,8 @@ export const AdminDashboard: React.FC = () => {
   const { isAdmin, user } = useAuth();
 
   const location = useLocation();
-  const activeTab = location.pathname.split('/').pop() === 'admin' ? 'templates' : location.pathname.split('/').pop() || 'templates';
+  const lastSegment = location.pathname.split('/').filter(Boolean).pop();
+  const activeTab = (!lastSegment || lastSegment === 'admin' || lastSegment === 'A9x7K2m8Q4p6L1z5-admin') ? 'templates' : lastSegment;
   const [modalOpen, setModalOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
   const [editingPost, setEditingPost] = useState<Template | null>(null);
@@ -794,7 +796,7 @@ export const AdminDashboard: React.FC = () => {
         </div>
 
         <div
-          onClick={() => navigate('/admin/downloads')}
+          onClick={() => navigate(`${ADMIN_BASE_PATH}/downloads`)}
           className={`bg-white rounded-[20px] p-4 shadow-sm border transition-all duration-300 flex flex-col cursor-pointer hover:shadow-md hover:border-emerald-300 hover:scale-[1.01] ${
             animatingDownload ? 'ring-2 ring-emerald-400 scale-[1.02] bg-emerald-50/30' : 'border-gray-100'
           }`}
