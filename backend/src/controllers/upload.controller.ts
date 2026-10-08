@@ -195,18 +195,24 @@ export class UploadController {
 
   /**
    * Generate a server-side 100% original quality composite video URL with circular gold photo overlay
-   * Zero frame drops, zero lag, 100% original audio, instant response.
+   * Zero frame drops, zero lag, 100% original audio, instant response, pure MP4.
    */
   static async compositeVideo(req: any, res: Response): Promise<void> {
     try {
-      const { videoUrl, photoUrl, format } = req.body;
-      if (!videoUrl || !photoUrl) {
-        res.status(400).json({ success: false, message: 'Missing videoUrl or photoUrl' });
+      const { videoUrl, photoUrl, format, slot, filename } = req.body;
+      if (!videoUrl) {
+        res.status(400).json({ success: false, message: 'Missing videoUrl' });
         return;
       }
 
       const isPostFormat = format === 'post';
-      const compositeUrl = CloudinaryService.generateCompositeVideoUrl(videoUrl, photoUrl, isPostFormat);
+      const compositeUrl = CloudinaryService.generateCompositeVideoUrl(
+        videoUrl,
+        photoUrl,
+        isPostFormat,
+        slot,
+        filename || 'craft-ai-story.mp4'
+      );
 
       if (compositeUrl) {
         res.status(200).json({

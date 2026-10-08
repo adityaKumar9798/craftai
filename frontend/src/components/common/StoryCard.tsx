@@ -72,15 +72,31 @@ export const StoryCard: React.FC<StoryCardProps> = ({
   const handleDownload = async (e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      let downloadUrl = template.assetUrl || template.thumbnailUrl;
-      if (userPhotoUrl) {
-        if (isVideo) {
+      const ext = isVideo ? 'mp4' : 'png';
+      const filename = `craft-ai-${template.category}-${Date.now()}.${ext}`;
+      let downloadUrl = isVideo
+        ? (template.videoUrl || template.assetUrl)
+        : (template.assetUrl || template.thumbnailUrl);
+
+      if (isVideo) {
+        if (userPhotoUrl) {
           try {
             downloadUrl = await CanvasRenderer.renderVideoWithOverlay(template, userPhotoUrl);
           } catch {
-            downloadUrl = template.videoUrl || template.assetUrl;
+            downloadUrl = CanvasRenderer.buildCloudinaryVideoUrl(template, userPhotoUrl, filename) ||
+                          (template.videoUrl || template.assetUrl);
           }
         } else {
+          const cldMp4 = CanvasRenderer.buildCloudinaryVideoUrl(template, undefined, filename);
+          if (cldMp4) {
+            downloadUrl = cldMp4;
+          } else if (downloadUrl) {
+            downloadUrl = downloadUrl.replace(/\.(mov|MOV|webm|avi|mkv|flv)$/i, '.mp4');
+          }
+        }
+      } else {
+        // Image handling 100% UNCHANGED
+        if (userPhotoUrl) {
           try {
             downloadUrl = await CanvasRenderer.renderStory(template, userPhotoUrl);
           } catch {
@@ -88,9 +104,6 @@ export const StoryCard: React.FC<StoryCardProps> = ({
           }
         }
       }
-
-      const ext = isVideo ? 'mp4' : 'png';
-      const filename = `craft-ai-${template.category}-${Date.now()}.${ext}`;
 
       await CanvasRenderer.downloadDataUrl(downloadUrl, filename);
       if (recordDownload) {

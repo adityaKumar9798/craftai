@@ -198,7 +198,9 @@ export const VideoStoriesPage: React.FC = () => {
                   setDownloading(true);
                   setDownloadProgress(1);
                   try {
+                    const filename = `craft-ai-${selectedVideo.category}-${Date.now()}.mp4`;
                     let dlUrl = selectedVideo.videoUrl || selectedVideo.assetUrl;
+
                     if (userPhotoUrl) {
                       try {
                         dlUrl = await CanvasRenderer.renderVideoWithOverlay(
@@ -208,11 +210,18 @@ export const VideoStoriesPage: React.FC = () => {
                         );
                       } catch (err) {
                         console.warn('Personalized video render fallback:', err);
-                        dlUrl = selectedVideo.videoUrl || selectedVideo.assetUrl;
+                        dlUrl = CanvasRenderer.buildCloudinaryVideoUrl(selectedVideo, userPhotoUrl, filename) ||
+                                (selectedVideo.videoUrl || selectedVideo.assetUrl);
+                      }
+                    } else {
+                      // Ensure video without photo overlay is also served as pure H.264 MP4 (never .mov)
+                      const cldMp4 = CanvasRenderer.buildCloudinaryVideoUrl(selectedVideo, undefined, filename);
+                      if (cldMp4) {
+                        dlUrl = cldMp4;
+                      } else if (dlUrl) {
+                        dlUrl = dlUrl.replace(/\.(mov|MOV|webm|avi|mkv|flv)$/i, '.mp4');
                       }
                     }
-
-                    const filename = `craft-ai-${selectedVideo.category}-${Date.now()}.mp4`;
                     await CanvasRenderer.downloadDataUrl(dlUrl, filename);
                     await recordDownload({
                       templateId: selectedVideo.id,

@@ -71,12 +71,15 @@ export const TemplatePreviewPage: React.FC = () => {
     setDownloading(true);
     setDownloadProgress(currentTemplate.type === 'video' ? 1 : null);
     try {
+      const ext = currentTemplate.type === 'video' ? 'mp4' : 'png';
+      const filename = `craft-ai-${currentTemplate.category}-${Date.now()}.${ext}`;
+
       let downloadUrl = currentTemplate.type === 'video'
         ? (currentTemplate.videoUrl || currentTemplate.assetUrl)
         : (currentTemplate.assetUrl || currentTemplate.thumbnailUrl);
 
-      if (userPhotoUrl) {
-        if (currentTemplate.type === 'video') {
+      if (currentTemplate.type === 'video') {
+        if (userPhotoUrl) {
           try {
             downloadUrl = await CanvasRenderer.renderVideoWithOverlay(
               currentTemplate,
@@ -85,9 +88,20 @@ export const TemplatePreviewPage: React.FC = () => {
             );
           } catch (e) {
             console.warn('Video render overlay fallback:', e);
-            downloadUrl = currentTemplate.videoUrl || currentTemplate.assetUrl;
+            downloadUrl = CanvasRenderer.buildCloudinaryVideoUrl(currentTemplate, userPhotoUrl, filename) ||
+                          (currentTemplate.videoUrl || currentTemplate.assetUrl);
           }
         } else {
+          const cldMp4 = CanvasRenderer.buildCloudinaryVideoUrl(currentTemplate, undefined, filename);
+          if (cldMp4) {
+            downloadUrl = cldMp4;
+          } else if (downloadUrl) {
+            downloadUrl = downloadUrl.replace(/\.(mov|MOV|webm|avi|mkv|flv)$/i, '.mp4');
+          }
+        }
+      } else {
+        // Image logic 100% UNCHANGED
+        if (userPhotoUrl) {
           try {
             downloadUrl = await CanvasRenderer.renderStory(currentTemplate, userPhotoUrl);
           } catch (e) {
@@ -96,9 +110,6 @@ export const TemplatePreviewPage: React.FC = () => {
           }
         }
       }
-
-      const ext = currentTemplate.type === 'video' ? 'mp4' : 'png';
-      const filename = `craft-ai-${currentTemplate.category}-${Date.now()}.${ext}`;
 
       // 1. Download directly to device local storage safely without navigation
       await CanvasRenderer.downloadDataUrl(downloadUrl, filename);

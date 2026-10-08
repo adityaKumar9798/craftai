@@ -97,35 +97,64 @@ export class CloudinaryService {
 
   /**
    * Generate high quality server-side composite video URL with circular gold user photo
-   * Zero frame drops, 100% original quality, original audio, zero client lag
+   * Zero frame drops, 100% original quality, original audio, zero client lag, pure MP4
    */
   static generateCompositeVideoUrl(
     videoUrl: string,
-    photoUrl: string,
-    isPostFormat: boolean = false
+    photoUrl?: string,
+    isPostFormat: boolean = false,
+    slot?: { x?: number; y?: number; width?: number; height?: number },
+    filename: string = 'craft-ai-story.mp4'
   ): string | null {
-    if (!videoUrl || !photoUrl) return null;
+    if (!videoUrl) return null;
 
     try {
-      const yOffset = isPostFormat ? 220 : 250;
-      const layerSize = isPostFormat ? 280 : 300;
+      // Always normalize output format to genuine .mp4 (never .mov or .webm)
+      let cleanVideoUrl = videoUrl.replace(/\.(mov|MOV|webm|avi|mkv|flv)$/i, '.mp4');
+      if (!cleanVideoUrl.endsWith('.mp4')) {
+        cleanVideoUrl = cleanVideoUrl + '.mp4';
+      }
 
-      // Extract user photo public ID or base64 fetch with PNG alpha channel
+      const cleanFilename = filename.replace(/\.(mp4|mov|webm)$/i, '').replace(/[^a-zA-Z0-9_-]/g, '_');
+
+      // If no photo overlay provided, return pure MP4 download URL
+      if (!photoUrl) {
+        if (cleanVideoUrl.includes('res.cloudinary.com') && cleanVideoUrl.includes('/video/upload/')) {
+          return cleanVideoUrl.replace(
+            '/video/upload/',
+            `/video/upload/fl_attachment:${cleanFilename},f_mp4,vc_h264,ac_aac/`
+          );
+        }
+        return cleanVideoUrl;
+      }
+
+      // Extract user photo public ID or base64 fetch
       let layerSpec = '';
       if (photoUrl.includes('res.cloudinary.com') && photoUrl.includes('/upload/')) {
         const afterUpload = photoUrl.split('/upload/')[1];
         const withoutVersion = afterUpload.replace(/^v\d+\//, '').replace(/\.[^/.]+$/, '');
         const formattedPublicId = withoutVersion.replace(/\//g, ':');
-        layerSpec = `l_${formattedPublicId}.png`;
+        layerSpec = `l_${formattedPublicId}`;
       } else if (photoUrl.startsWith('http')) {
         const base64Url = Buffer.from(photoUrl).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
         layerSpec = `l_fetch:${base64Url}`;
       }
 
-      if (layerSpec && videoUrl.includes('res.cloudinary.com') && videoUrl.includes('/video/upload/')) {
-        // f_png ensures transparent alpha channel outside the r_max circle, removing any white box
-        const overlayTransform = `${layerSpec}/c_fill,w_${layerSize},h_${layerSize},r_max,bo_10px_solid_rgb:E5C158,f_png/fl_layer_apply,g_south,y_${yOffset}`;
-        return videoUrl.replace('/video/upload/', `/video/upload/${overlayTransform}/`);
+      if (layerSpec && cleanVideoUrl.includes('res.cloudinary.com') && cleanVideoUrl.includes('/video/upload/')) {
+        let positionTransform = '';
+        if (slot && typeof slot.x === 'number' && typeof slot.y === 'number' && slot.x > 0 && slot.y > 0) {
+          const wRel = Math.max(0.18, Math.min(0.6, slot.width || 0.28));
+          const xRel = Math.max(0, Math.min(0.9, slot.x));
+          const yRel = Math.max(0, Math.min(0.9, slot.y));
+          positionTransform = `${layerSpec},c_fill,w_${wRel},h_${wRel},fl_relative,r_max,bo_8px_solid_rgb:E5C158/fl_layer_apply,g_north_west,x_${xRel},y_${yRel},fl_relative`;
+        } else {
+          const yOffset = isPostFormat ? 0.2 : 0.15;
+          const sizeRel = isPostFormat ? 0.28 : 0.26;
+          positionTransform = `${layerSpec},c_fill,w_${sizeRel},h_${sizeRel},fl_relative,r_max,bo_8px_solid_rgb:E5C158/fl_layer_apply,g_south,y_${yOffset},fl_relative`;
+        }
+
+        const overlayTransform = `${positionTransform}/fl_attachment:${cleanFilename},f_mp4,vc_h264,ac_aac`;
+        return cleanVideoUrl.replace('/video/upload/', `/video/upload/${overlayTransform}/`);
       }
     } catch (e) {
       console.warn('generateCompositeVideoUrl error:', e);
