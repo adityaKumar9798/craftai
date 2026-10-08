@@ -6,10 +6,20 @@
     "dev": "npm run dev --prefix frontend",
     "dev:all": "concurrently \"npm run dev --prefix frontend\" \"npm run dev --prefix backend\"",
     "dev:backend": "npm run dev --prefix backend",
+    "build": "npm run build --prefix frontend",
     "build:frontend": "npm run build --prefix frontend",
     "build:backend": "npm run build --prefix backend"
   },
   "devDependencies": {
     "concurrently": "^10.0.5"
+  },
+  "dependencies": {
+    "cloudinary": "^2.11.0",
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.6",
+    "express": "^5.2.1",
+    "firebase-admin": "^14.5.0",
+    "multer": "^2.4.0",
+    "serverless-http": "^4.0.0"
   }
 }

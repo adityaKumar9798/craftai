@@ -18,6 +18,14 @@ app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
+// Normalize Netlify function URLs (e.g. /.netlify/functions/api/... -> /api/...)
+app.use((req, res, next) => {
+  if (req.url.startsWith('/.netlify/functions/api')) {
+    req.url = req.url.replace('/.netlify/functions/api', '/api') || '/api';
+  }
+  next();
+});
+
 // Health check route
 app.get('/api/health', (req, res) => {
   res.status(200).json({

@@ -1,2 +1,2 @@
-/api/*  https://craftai-n74y.onrender.com/api/:splat  200!
-/*      /index.html                                   200
+/api/*  /.netlify/functions/api/:splat  200!
+/*      /index.html                     200
