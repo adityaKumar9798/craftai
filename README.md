@@ -1,4 +1,6 @@
 # Craft AI — Your Photo. Every Story.
+[![Netlify Status](https://api.netlify.com/api/v1/badges/9a8d9874-8282-4342-95a8-3b1031c0f3b0/deploy-status)](https://app.netlify.com/projects/craftaiapp/deploys)
+
 ## Complete Production-Ready Web Application
 ### React + Vite + TypeScript + Tailwind CSS + Node.js + Express + Firebase + Cloudinary
 
